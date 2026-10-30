@@ -90,7 +90,7 @@ export function TopBarLeft({ onAddClick }: TopBarLeftProps) {
     : isGoalSelected || isAnalysisSelected
 
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (typeof window === "undefined" || !window.matchMedia) return
 
     const mediaQuery = window.matchMedia("(max-width: 1200px)")
     const applyNavMode = (matches: boolean) => {
