@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Calendar, Trash2, ListChecks, Check, Sun, Flag } from "lucide-react";
 import { format } from "date-fns";
-import { AnimatePresence, motion } from "framer-motion";
 import { useTasksStore, type TaskItem } from "@/store/tasksStore";
 import { TaskSidebar } from "./TaskSidebar";
 
@@ -200,101 +199,81 @@ export default function TaskView() {
       {/* Inbox View: Sections as Columns consuming available space */}
       {activeView === "inbox" ? (
         <div className="flex min-h-0 w-full flex-1 items-stretch gap-4 overflow-x-auto overflow-y-hidden pb-2 no-scrollbar">
-          <AnimatePresence mode="popLayout">
-            {inboxSections.map((sec) => {
-              const sectionTasks = tasks.filter(
-                (t) =>
-                  (t.sectionId === sec.id || (!t.sectionId && sec.id === inboxSections[0]?.id)) &&
-                  !t.completed
-              );
-              const isEditingTitle = editingSectionId === sec.id;
+          {inboxSections.map((sec) => {
+            const sectionTasks = tasks.filter(
+              (t) =>
+                (t.sectionId === sec.id || (!t.sectionId && sec.id === inboxSections[0]?.id)) &&
+                !t.completed
+            );
+            const isEditingTitle = editingSectionId === sec.id;
 
-              return (
-                <motion.div
-                  key={sec.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
-                  transition={{
-                    layout: { type: "spring", stiffness: 320, damping: 30 },
-                    opacity: { duration: 0.2 },
-                  }}
-                  className="flex h-full min-h-0 min-w-[280px] flex-1 flex-col overflow-hidden rounded-2xl border border-black/5 bg-white/60 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl"
-                >
-                  <motion.div
-                    layout="position"
-                    className="flex-1 min-h-0 flex flex-col relative px-4 pt-4 pb-4 overflow-hidden"
-                  >
-                    {/* Section Heading */}
-                    <motion.div layout="position" className="mb-3 flex items-center justify-between group/sec-title min-h-[44px]">
-                      {isEditingTitle ? (
-                        <input
-                          autoFocus
-                          value={editingTitleText}
-                          onChange={(e) => setEditingTitleText(e.target.value)}
-                          onBlur={() => handleSaveSectionTitle(sec.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleSaveSectionTitle(sec.id);
-                            if (e.key === "Escape") setEditingSectionId(null);
-                          }}
-                          className="text-4xl md:text-5xl font-bold tracking-tight text-neutral-900 bg-transparent border-b border-black/20 outline-none w-full"
-                        />
-                      ) : (
-                        <motion.h2
-                          layout="position"
-                          onClick={() => {
-                            setEditingSectionId(sec.id);
-                            setEditingTitleText(sec.title);
-                          }}
-                          title="Click to rename"
-                          className="text-4xl md:text-5xl font-bold tracking-tight leading-tight bg-gradient-to-b from-black to-neutral-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity truncate"
-                        >
-                          {sec.title}
-                        </motion.h2>
-                      )}
+            return (
+              <div
+                key={sec.id}
+                className="flex h-full min-h-0 min-w-[280px] flex-1 flex-col overflow-hidden rounded-2xl border border-black/5 bg-white/60 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl"
+              >
+                <div className="flex-1 min-h-0 flex flex-col relative px-4 pt-4 pb-4 overflow-hidden">
+                  {/* Section Heading */}
+                  <div className="mb-3 flex items-center justify-between group/sec-title min-h-[44px]">
+                    {isEditingTitle ? (
+                      <input
+                        autoFocus
+                        value={editingTitleText}
+                        onChange={(e) => setEditingTitleText(e.target.value)}
+                        onBlur={() => handleSaveSectionTitle(sec.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleSaveSectionTitle(sec.id);
+                          if (e.key === "Escape") setEditingSectionId(null);
+                        }}
+                        className="text-4xl md:text-5xl font-bold tracking-tight text-neutral-900 bg-transparent border-b border-black/20 outline-none w-full"
+                      />
+                    ) : (
+                      <h2
+                        onClick={() => {
+                          setEditingSectionId(sec.id);
+                          setEditingTitleText(sec.title);
+                        }}
+                        title="Click to rename"
+                        className="text-4xl md:text-5xl font-bold tracking-tight leading-tight bg-gradient-to-b from-black to-neutral-500 bg-clip-text text-transparent cursor-pointer hover:opacity-80 transition-opacity truncate"
+                      >
+                        {sec.title}
+                      </h2>
+                    )}
 
-                      {inboxSections.length > 1 && !isEditingTitle && (
-                        <button
-                          type="button"
-                          onClick={() => deleteSection(sec.id)}
-                          title="Delete section"
-                          className="opacity-0 group-hover/sec-title:opacity-100 text-neutral-400 hover:text-red-500 transition-opacity p-1.5 rounded-md hover:bg-black/5"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </motion.div>
+                    {inboxSections.length > 1 && !isEditingTitle && (
+                      <button
+                        type="button"
+                        onClick={() => deleteSection(sec.id)}
+                        title="Delete section"
+                        className="opacity-0 group-hover/sec-title:opacity-100 text-neutral-400 hover:text-red-500 transition-opacity p-1.5 rounded-md hover:bg-black/5"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
 
-                    {/* Tasks List */}
-                    <motion.div layout="position" className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-2.5 pr-0.5">
-                      {sectionTasks.map((task) => renderTaskCard(task))}
+                  {/* Tasks List */}
+                  <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex flex-col gap-2.5 pr-0.5">
+                    {sectionTasks.map((task) => renderTaskCard(task))}
 
-                      {/* Add Button - Directly opens sidebar */}
-                      <div className="pt-0.5">
-                        <div
-                          onClick={() => handleOpenAddSidebar(sec.id)}
-                          className="flex items-center gap-3.5 py-2.5 px-3 rounded-lg cursor-pointer transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-black/5"
-                        >
-                          <div className="h-6 w-6 shrink-0 rounded-full border-2 border-neutral-300 opacity-40 pointer-events-none" />
-                          <span className="text-xl font-medium">Add...</span>
-                        </div>
+                    {/* Add Button - Directly opens sidebar */}
+                    <div className="pt-0.5">
+                      <div
+                        onClick={() => handleOpenAddSidebar(sec.id)}
+                        className="flex items-center gap-3.5 py-2.5 px-3 rounded-lg cursor-pointer transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-black/5"
+                      >
+                        <div className="h-6 w-6 shrink-0 rounded-full border-2 border-neutral-300 opacity-40 pointer-events-none" />
+                        <span className="text-xl font-medium">Add...</span>
                       </div>
-                    </motion.div>
-                  </motion.div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
 
           {/* Vertical Add Section Button - Centered in middle on right */}
-          <motion.div
-            layout
-            transition={{
-              layout: { type: "spring", stiffness: 320, damping: 30 },
-            }}
-            className="flex h-56 w-14 shrink-0 self-center items-center justify-center"
-          >
+          <div className="flex h-56 w-14 shrink-0 self-center items-center justify-center">
             <button
               type="button"
               onClick={handleAddSectionClick}
@@ -308,7 +287,7 @@ export default function TaskView() {
                 Add Section
               </span>
             </button>
-          </motion.div>
+          </div>
         </div>
       ) : activeView === "today" ? (
         /* Today View */
