@@ -13,12 +13,63 @@ function Logo({ className = "h-8 w-8" }: { className?: string }) {
   return <img src="/applogo.png" alt="Waydots" className={className} />;
 }
 
+function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24">
+      <path
+        fill="#4285F4"
+        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.98 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+      />
+    </svg>
+  )
+}
+
 function LoginContent() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const navigate = useNavigate()
+
+  const handleGoogleLogin = async () => {
+    setError('')
+    setGoogleLoading(true)
+    try {
+      const redirectOrigin =
+        typeof window !== 'undefined' ? window.location.origin : 'https://waydots.app'
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'https://www.googleapis.com/auth/gmail.readonly email profile',
+          redirectTo: `${redirectOrigin}/mail`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      })
+      if (error) {
+        setError(error.message)
+        setGoogleLoading(false)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to initialize Google login')
+      setGoogleLoading(false)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -164,16 +215,37 @@ function LoginContent() {
               </Button>
             </form>
             
-            <div className="relative mt-6">
+            <div className="relative mt-6 mb-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-border/50" />
               </div>
               <div className="relative flex justify-center text-[10px] uppercase">
-                <span className="bg-transparent px-2 text-muted-foreground font-bold tracking-widest">
-                  Or
+                <span className="bg-card px-2 text-muted-foreground font-bold tracking-widest">
+                  Or continue with
                 </span>
               </div>
             </div>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={handleGoogleLogin}
+              disabled={loading || googleLoading}
+              className="w-full rounded-full font-semibold border-border/60 bg-background/60 hover:bg-background/90 shadow-2xs transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 cursor-pointer h-11"
+            >
+              {googleLoading ? (
+                <span className="flex items-center gap-2 text-xs">
+                  <span className="h-4 w-4 border-2 border-foreground/30 border-t-foreground rounded-full animate-spin" />
+                  Connecting to Google...
+                </span>
+              ) : (
+                <span className="flex items-center gap-2.5 text-xs text-foreground font-semibold">
+                  <GoogleIcon className="h-4 w-4" />
+                  <span>Sign in with Google</span>
+                </span>
+              )}
+            </Button>
 
             <p className="mt-5 text-center text-sm text-muted-foreground">
               Don't have an account?{' '}
