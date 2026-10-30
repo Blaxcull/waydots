@@ -76,8 +76,8 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   // When on /mail, render the 4 mail sections: Inbox, Starred, Draft, Sent
   if (isMailView) {
     return (
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-        <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto rounded-full border border-black/5 bg-[#ececeb] p-2 shadow-sm">
+      <div className="pointer-events-none fixed inset-x-0 bottom-4 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
+        <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto no-scrollbar rounded-full border border-black/5 bg-[#ececeb]/95 sm:bg-[#ececeb] p-1.5 sm:p-2 shadow-lg sm:shadow-sm backdrop-blur-md">
           {mailTabs.map((tab, i) => {
             const isActive = activeFolder === tab.id
             const nextTab = mailTabs[i + 1]
@@ -88,7 +88,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 <Button
                   onClick={() => setActiveFolder(tab.id)}
                   className={cn(
-                    "w-[120px] rounded-full py-6 text-xl font-semibold capitalize",
+                    "w-auto px-3.5 py-1.5 text-xs sm:w-[120px] sm:py-6 sm:text-xl font-semibold capitalize",
                     "transition-all duration-200 ease-out",
                     "bg-transparent text-neutral-600",
                     "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
@@ -101,7 +101,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 {i < mailTabs.length - 1 && (
                   <div
                     className={cn(
-                      "w-px h-8 bg-gray-300 mx-1 transition-opacity duration-200",
+                      "w-px h-5 sm:h-8 bg-gray-300 mx-0.5 sm:mx-1 transition-opacity duration-200",
                       isActive || nextActive ? "opacity-0" : "opacity-100"
                     )}
                   />
@@ -117,8 +117,8 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   // When on /todos, render the 4 task sections: Inbox, Today, Upcoming, Completed
   if (isTodoView) {
     return (
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-        <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto rounded-full border border-black/5 bg-[#ececeb] p-2 shadow-sm">
+      <div className="pointer-events-none fixed inset-x-0 bottom-4 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
+        <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto no-scrollbar rounded-full border border-black/5 bg-[#ececeb]/95 sm:bg-[#ececeb] p-1.5 sm:p-2 shadow-lg sm:shadow-sm backdrop-blur-md">
           {taskViews.map((tab, i) => {
             const isActive = activeTaskView === tab
             const nextTab = taskViews[i + 1]
@@ -129,7 +129,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 <Button
                   onClick={() => setActiveTaskView(tab)}
                   className={cn(
-                    "w-[125px] rounded-full py-6 text-xl font-semibold capitalize",
+                    "w-auto px-3.5 py-1.5 text-xs sm:w-[125px] sm:py-6 sm:text-xl font-semibold capitalize",
                     "transition-all duration-200 ease-out",
                     "bg-transparent text-neutral-600",
                     "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
@@ -142,7 +142,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 {i < taskViews.length - 1 && (
                   <div
                     className={cn(
-                      "w-px h-8 bg-gray-300 mx-1 transition-opacity duration-200",
+                      "w-px h-5 sm:h-8 bg-gray-300 mx-0.5 sm:mx-1 transition-opacity duration-200",
                       isActive || nextActive ? "opacity-0" : "opacity-100"
                     )}
                   />
@@ -156,8 +156,8 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
-      <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto rounded-full border border-black/5 bg-[#ececeb] p-2 shadow-sm">
+    <div className="pointer-events-none fixed inset-x-0 bottom-4 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
+      <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto no-scrollbar rounded-full border border-black/5 bg-[#ececeb]/95 sm:bg-[#ececeb] p-1.5 sm:p-2 shadow-lg sm:shadow-sm backdrop-blur-md">
         {views.map((view, i) => {
           const isActive = activeView === view
           const nextView = views[i + 1]
@@ -168,7 +168,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
               <Button
                 onClick={() => handleViewClick(view)}
                 className={cn(
-                  "w-[120px] rounded-full py-6 text-xl font-semibold capitalize",
+                  "w-auto px-3.5 py-1.5 text-xs sm:w-[120px] sm:py-6 sm:text-xl font-semibold capitalize",
                   "transition-all duration-200 ease-out",
                   "bg-transparent text-neutral-600",
                   "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
@@ -181,7 +181,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
               {i < views.length - 1 && (
                 <div
                   className={cn(
-                    "w-px h-8 bg-gray-300 mx-1 transition-opacity duration-200",
+                    "w-px h-5 sm:h-8 bg-gray-300 mx-0.5 sm:mx-1 transition-opacity duration-200",
                     isActive || nextActive ? "opacity-0" : "opacity-100"
                   )}
                 />

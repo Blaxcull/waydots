@@ -26,7 +26,7 @@ export default function AnalysisView() {
 
   return (
     <main className="min-h-screen bg-white text-gray-900">
-      <div className="mx-auto max-w-[1800px] px-5 pb-16 pt-24 md:pt-28">
+      <div className="mx-auto max-w-[1800px] px-3 sm:px-5 pb-24 sm:pb-16 pt-16 sm:pt-28">
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-[0.8fr_1.2fr]">
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-5">

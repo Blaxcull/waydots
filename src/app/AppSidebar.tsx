@@ -15,8 +15,8 @@ export function SearchControlButton({
     <div
       className={
         inline
-          ? "flex items-center gap-3"
-          : "pointer-events-auto fixed right-4 top-4 z-[20050] flex items-center gap-3"
+          ? "flex items-center gap-2 sm:gap-3"
+          : "pointer-events-auto fixed right-3 top-3 sm:right-4 sm:top-4 z-[20050] flex items-center gap-2 sm:gap-3"
       }
     >
       <MailTodoPill />
@@ -26,12 +26,12 @@ export function SearchControlButton({
         onClick={onOpenSearch}
         className={
           inline
-            ? "h-16 w-16 rounded-full border border-black/5 bg-[#e7e7e4] text-slate-600 shadow-sm transition-all duration-200 ease-out hover:scale-105 hover:text-slate-800 hover:shadow-md"
-            : "h-16 w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl"
+            ? "h-11 w-11 sm:h-16 sm:w-16 rounded-full border border-black/5 bg-[#e7e7e4] text-slate-600 shadow-sm transition-all duration-200 ease-out hover:scale-105 hover:text-slate-800 hover:shadow-md p-0 flex items-center justify-center"
+            : "h-11 w-11 sm:h-16 sm:w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-md sm:shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl p-0 flex items-center justify-center"
         }
         aria-label="Search events"
       >
-        <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
+        <img src={SearchIcon} alt="Search" className="h-5 w-5 sm:h-8 sm:w-8 opacity-60" />
       </Button>
     </div>
   )
@@ -64,7 +64,7 @@ export function CompactSidebarOverlay({ isVisible, onClose }: CompactSidebarOver
         onClick={onClose}
       />
       <div
-        className={`fixed inset-y-0 right-0 z-[20010] flex max-w-[calc(100vw-24px)] flex-col overflow-hidden pr-3 pt-3 pb-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        className={`fixed inset-y-0 right-0 z-[20010] flex w-full max-w-full sm:max-w-[calc(100vw-24px)] flex-col overflow-hidden pr-0 sm:pr-3 pt-0 sm:pt-3 pb-0 sm:pb-3 transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
           isVisible ? 'translate-x-0' : 'translate-x-full'
         }`}
       >

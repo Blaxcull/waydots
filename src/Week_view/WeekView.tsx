@@ -857,9 +857,9 @@ const WeekView = () => {
 
   return (
     <div className="h-full w-full bg-[#f3f3f2] flex items-center justify-center overflow-hidden select-none">
-      <div className="h-[100%] w-[100%] rounded-l-2xl bg-[#ececeb] shadow-xl flex flex-col overflow-hidden">
-        <div className="px-9 pt-32 pb-3 border-b border-white/20 shrink-0">
-          <h1 className="text-6xl pb-0 font-semibold text-neutral-800 tracking-tight">
+      <div className="h-[100%] w-[100%] rounded-none sm:rounded-l-2xl bg-[#ececeb] shadow-xl flex flex-col overflow-hidden">
+        <div className="px-4 pt-16 pb-3 sm:px-9 sm:pt-32 sm:pb-3 border-b border-white/20 shrink-0">
+          <h1 className="text-2xl sm:text-6xl pb-0 font-semibold text-neutral-800 tracking-tight">
             <span className="text-black">
               {format(weekStart, "d MMM")} - {format(addDays(weekStart, 6), "d MMM")},
             </span>
@@ -870,8 +870,8 @@ const WeekView = () => {
           </h1>
         </div>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar bg-[#e2e2e1]">
-          <div className="pb-14 bg-[#e2e2e1]">
+        <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto no-scrollbar bg-[#e2e2e1]">
+          <div className="pb-24 sm:pb-14 bg-[#e2e2e1] min-w-[700px] md:min-w-0">
             <div ref={stickyHeaderRef} className="sticky top-0 z-[500] isolate relative bg-[#e2e2e1]">
               <div className="flex relative z-[520] bg-[#e2e2e1]">
                 <div className="w-[84px] shrink-0" />

@@ -315,25 +315,25 @@ export function TopBarLeft({ onAddClick }: TopBarLeftProps) {
         </Button>
       </div>
 
-      <div className={`fixed left-4 top-4 z-[20020] items-center gap-3 ${useCondensedNav ? "flex" : "hidden"}`}>
+      <div className={`fixed left-3 top-3 sm:left-4 sm:top-4 z-[20020] items-center gap-2 sm:gap-3 ${useCondensedNav ? "flex" : "hidden"}`}>
         <Button
           type="button"
           variant="ghost"
           onClick={() => setMobileMenuOpen(true)}
-          className="h-16 w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:text-slate-800 hover:scale-110 hover:shadow-xl active:scale-95"
+          className="h-11 w-11 sm:h-16 sm:w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-md sm:shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:text-slate-800 hover:scale-110 hover:shadow-xl active:scale-95 p-0 flex items-center justify-center"
           aria-label="Open navigation menu"
         >
-          <Menu className="h-7 w-7 opacity-80" />
+          <Menu className="h-5 w-5 sm:h-7 sm:w-7 opacity-80" />
         </Button>
         <Button
           type="button"
           variant="ghost"
           onClick={handlePlusClick}
-          className="flex h-16 w-16 items-center justify-center rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:text-slate-800 hover:scale-110 hover:shadow-xl active:scale-95"
+          className="flex h-11 w-11 sm:h-16 sm:w-16 items-center justify-center rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-md sm:shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:text-slate-800 hover:scale-110 hover:shadow-xl active:scale-95 p-0"
           aria-label={plusAriaLabel}
           title={plusAriaLabel}
         >
-          <img src={plusIcon} alt={plusAriaLabel} className="w-7 h-7 opacity-80" />
+          <img src={plusIcon} alt={plusAriaLabel} className="w-5 h-5 sm:w-7 sm:h-7 opacity-80" />
         </Button>
       </div>
 
@@ -345,7 +345,7 @@ export function TopBarLeft({ onAddClick }: TopBarLeftProps) {
             aria-label="Close navigation menu"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="fixed left-4 top-4 z-[20040] w-[min(280px,calc(100vw-32px))] rounded-[28px] border border-black/5 bg-[#ececeb]/98 p-3 shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
+          <div className="fixed left-3 top-3 sm:left-4 sm:top-4 z-[20040] w-[min(280px,calc(100vw-24px))] rounded-[28px] border border-black/5 bg-[#ececeb]/98 p-3 shadow-[0_24px_60px_rgba(0,0,0,0.22)] backdrop-blur-md">
             <div className="flex items-center justify-between px-2 pb-3">
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-neutral-500">Navigate</div>
               <Button

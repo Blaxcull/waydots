@@ -107,19 +107,19 @@ export function MailTodoPill({
         aria-label="Mail"
         title="Mail"
         className={cn(
-          "h-16 w-16 flex items-center justify-center cursor-pointer rounded-full",
+          "h-11 w-11 sm:h-16 sm:w-16 flex items-center justify-center cursor-pointer rounded-full",
           "transition-all duration-200 ease-out active:scale-95 border",
           mailActive
             ? "bg-[#dddddd] border-white/80 shadow-inner scale-90 hover:scale-100 hover:bg-[#e7e7e6] hover:shadow-lg"
             : "border-transparent hover:border-white/40 hover:shadow-lg hover:scale-100"
         )}
       >
-        <MailIcon className="w-9 h-9 text-[#404040] opacity-80" />
+        <MailIcon className="w-5 h-5 sm:w-9 sm:h-9 text-[#404040] opacity-80" />
       </button>
 
       {/* Divider */}
       {!anyActive && (
-        <div className="w-px h-9 bg-gray-300 transition-opacity duration-150 group-hover:opacity-0" />
+        <div className="w-px h-5 sm:h-9 bg-gray-300 transition-opacity duration-150 group-hover:opacity-0" />
       )}
 
       {/* To-Do List Button */}
@@ -129,7 +129,7 @@ export function MailTodoPill({
         aria-label="To-do list"
         title="To-do list"
         className={cn(
-          "h-16 w-16 flex items-center justify-center cursor-pointer rounded-full",
+          "h-11 w-11 sm:h-16 sm:w-16 flex items-center justify-center cursor-pointer rounded-full",
           "transition-all duration-200 ease-out active:scale-95 border",
           todoActive
             ? "bg-[#dddddd] border-white/80 shadow-inner scale-90 hover:scale-100 hover:bg-[#e7e7e6] hover:shadow-lg"
@@ -141,10 +141,10 @@ export function MailTodoPill({
             src={progressIcon}
             alt="To-do list"
             onError={() => setImageError(true)}
-            className="w-9 h-9 opacity-80 object-contain"
+            className="w-5 h-5 sm:w-9 sm:h-9 opacity-80 object-contain"
           />
         ) : (
-          <TodoIcon className="w-9 h-9 text-[#404040] opacity-80" />
+          <TodoIcon className="w-5 h-5 sm:w-9 sm:h-9 text-[#404040] opacity-80" />
         )}
       </button>
     </div>

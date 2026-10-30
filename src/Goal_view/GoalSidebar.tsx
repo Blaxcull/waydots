@@ -144,18 +144,18 @@ const GoalSidebar = ({
               animate={{ x: 0 }}
               exit={{ x: 600 }}
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-              className="fixed right-0 top-0 bottom-0 z-[20100] flex w-[600px] flex-col overflow-hidden border-l border-gray-300 bg-neutral-100 text-neutral-800"
+              className="fixed right-0 top-0 bottom-0 z-[20100] flex w-full max-w-[600px] flex-col overflow-hidden border-l border-gray-300 bg-neutral-100 text-neutral-800"
             >
               <div className="px-4 pb-3 pt-4 shrink-0">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="mt-2 text-[34px] font-semibold text-neutral-800">{title}</h2>
+                    <h2 className="mt-2 text-2xl sm:text-[34px] font-semibold text-neutral-800">{title}</h2>
                   </div>
                   <button
                     onClick={onToggle}
-                    className="flex h-16 w-16 items-center justify-center rounded-full border border-black/5 bg-white/60 text-slate-600 shadow-lg backdrop-blur-md transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl active:scale-95"
+                    className="flex h-11 w-11 sm:h-16 sm:w-16 items-center justify-center rounded-full border border-black/5 bg-white/60 text-slate-600 shadow-md sm:shadow-lg backdrop-blur-md transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl active:scale-95"
                   >
-                    <ChevronRight className="h-6 w-6" />
+                    <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
                   </button>
                 </div>
               </div>

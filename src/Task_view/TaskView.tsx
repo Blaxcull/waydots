@@ -195,7 +195,7 @@ export default function TaskView() {
   );
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200 p-4 pt-[120px] gap-4 text-neutral-900">
+    <div className="relative flex h-screen w-full overflow-hidden bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200 p-2 sm:p-4 pt-16 sm:pt-[120px] pb-24 sm:pb-4 gap-4 text-neutral-900">
       {/* Inbox View: Sections as Columns consuming available space */}
       {activeView === "inbox" ? (
         <div className="flex min-h-0 w-full flex-1 items-stretch gap-4 overflow-x-auto overflow-y-hidden pb-2 no-scrollbar">

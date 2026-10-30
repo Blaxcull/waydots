@@ -603,7 +603,7 @@ export default function MailView() {
       : "Sent"
 
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#f3f3f2] pt-[116px] px-4 pb-4">
+    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#f3f3f2] pt-16 sm:pt-[116px] px-2 sm:px-4 pb-24 sm:pb-4">
       {/* Gmail-Style Bottom-Left "Conversation moved to Trash" Toast with Undo (5s) */}
       {trashToast && (
         <div className="fixed bottom-6 left-6 z-50 flex items-center gap-4 rounded-lg bg-white px-4 py-3 text-sm text-neutral-800 shadow-[0_6px_24px_rgba(0,0,0,0.18)] border border-gray-200/90 select-none animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -778,8 +778,8 @@ export default function MailView() {
         {!selectedEmail ? (
           <div className="flex h-full w-full flex-col overflow-hidden bg-[#ececeb]">
             {/* Header: All | High (x) | Med (y) | Low (z) | Priority Wise */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-300/70 px-6 py-3.5 bg-[#ececeb]">
-              <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-300/70 px-3 sm:px-6 py-3 bg-[#ececeb]">
+              <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar max-w-full pb-1 sm:pb-0">
                 {/* Fast Priority Filter Pills: All | High | Med | Low */}
                 <div className="flex items-center rounded-full border border-gray-300/80 bg-[#dededc] p-1 shadow-inner">
                   <button
@@ -1204,7 +1204,7 @@ export default function MailView() {
           /* VIEW 2: SPLIT VIEW (Left: Opened Email Conversation, Right: Mailbox Overview List) */
           <>
             {/* LEFT COLUMN: Opened Email Conversation & Actions */}
-            <div className="flex flex-1 flex-col overflow-y-auto bg-neutral-100/90 p-6 md:p-8">
+            <div className="flex flex-1 flex-col overflow-y-auto bg-neutral-100/90 p-4 sm:p-6 md:p-8">
               {/* Back to Full List Button Header */}
               <div className="flex items-center justify-between pb-4 border-b border-gray-200">
                 <Button
@@ -1624,7 +1624,7 @@ export default function MailView() {
             </div>
 
             {/* RIGHT COLUMN: Mailbox Overview List */}
-            <div className="flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-l border-gray-300/70 bg-[#ececeb]">
+            <div className="hidden md:flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-l border-gray-300/70 bg-[#ececeb]">
               {/* Header with expand to full page button */}
               <div className="flex items-center justify-between border-b border-gray-300/70 px-4 py-3 bg-[#e7e7e6]">
                 <div className="flex items-center gap-2">

@@ -105,7 +105,7 @@ function SignupContent() {
   }
 
   return (
-    <div className="relative flex flex-col items-center justify-center min-h-screen p-6 bg-background overflow-hidden font-sf-pro">
+    <div className="relative flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 bg-background overflow-hidden font-sf-pro">
       {/* Background Elements */}
       <div 
         className="absolute inset-0 -z-10 w-full h-full opacity-50"
@@ -132,7 +132,7 @@ function SignupContent() {
         initial={{ opacity: 0, x: -10 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5 }}
-        className="absolute top-8 left-8 z-10"
+        className="absolute top-4 left-4 sm:top-8 sm:left-8 z-10"
       >
         <Link 
           to="/" 

@@ -62,14 +62,14 @@ const YearView = () => {
 
   return (
     <div className="h-full w-full bg-[#f3f3f2] flex items-center justify-center overflow-hidden select-none">
-      <div className="h-full w-full rounded-l-2xl bg-[#ececeb] shadow-xl flex flex-col overflow-hidden">
-        <div className="px-9 pt-32 pb-3 border-b border-white/20 shrink-0 bg-[#ececeb]">
-          <h1 className="text-6xl font-semibold tracking-tight text-neutral-800">
+      <div className="h-full w-full rounded-none sm:rounded-l-2xl bg-[#ececeb] shadow-xl flex flex-col overflow-hidden">
+        <div className="px-4 pt-16 pb-3 sm:px-9 sm:pt-32 sm:pb-3 border-b border-white/20 shrink-0 bg-[#ececeb]">
+          <h1 className="text-3xl sm:text-6xl font-semibold tracking-tight text-neutral-800">
             <span>{displayYear}</span>
           </h1>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#e2e2e1] px-4 pb-4 pt-4 no-scrollbar">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#e2e2e1] px-3 sm:px-4 pb-24 sm:pb-4 pt-4 no-scrollbar">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {months.map(({ monthDate, visibleWeeks }) => (
               <div

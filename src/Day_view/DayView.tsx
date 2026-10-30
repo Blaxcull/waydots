@@ -143,16 +143,16 @@ const DayView = () => {
   return (
     <div className="h-full w-full bg-[#f3f3f2] flex items-center justify-center overflow-hidden select-none">
       {/* APP WINDOW */}
-      <div className="h-[100%] w-[100%] rounded-l-2xl bg-[#ececeb] shadow-xl flex flex-col overflow-hidden">
+      <div className="h-[100%] w-[100%] rounded-none sm:rounded-l-2xl bg-[#ececeb] shadow-xl flex flex-col overflow-hidden">
         {/* HEADER */}
-        <div className="px-9 pt-32 pb-3 border-b border-white/20 shrink-0">
-          <h1 className="text-6xl pb-7 font-semibold text-neutral-800 tracking-tight">
+        <div className="px-4 pt-16 pb-3 sm:px-9 sm:pt-32 sm:pb-3 border-b border-white/20 shrink-0">
+          <h1 className="text-3xl sm:text-6xl pb-2 sm:pb-7 font-semibold text-neutral-800 tracking-tight">
             <span className="text-black">
               {displayDate?.monthName} {displayDate?.day},
             </span>
             <span className="text-neutral-400 font-normal"> {displayDate?.year}</span>
           </h1>
-          <p className="mt-2 text-3xl text-neutral-700">{displayDate?.dayName}</p>
+          <p className="mt-1 sm:mt-2 text-xl sm:text-3xl text-neutral-700">{displayDate?.dayName}</p>
         </div>
 
 
@@ -261,19 +261,19 @@ const DayView = () => {
 
     <TimeLine />
 
-    <div className="pb-17 flex relative">
+    <div className="pb-24 sm:pb-17 flex relative">
       
       {/* ⏰ LEFT COLUMN — TIME */}
-      <div className="w-[72px] shrink-0">
+      <div className="w-[56px] sm:w-[72px] shrink-0">
         {hourSlots.map((hour) => (
           <div
             key={hour}
-            className="flex items-center justify-end pr-3 "
+            className="flex items-center justify-end pr-2 sm:pr-3"
             style={{ height: `${hourHeight}px` }}
           >
-            <span className="text-black text-xl font-space-mono">
+            <span className="text-black text-sm sm:text-xl font-space-mono">
               {hour.toString().padStart(2, "0")}
-              <span className="text-gray-600 text-lg">:00</span>
+              <span className="text-gray-600 text-xs sm:text-lg">:00</span>
             </span>
           </div>
         ))}

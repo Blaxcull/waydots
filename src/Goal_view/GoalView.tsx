@@ -774,17 +774,17 @@ const GoalView = () => {
   };
 
   return (
-    <div className="relative flex h-screen w-full overflow-hidden bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200 p-4 pt-[120px] gap-4">
-      <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
+    <div className="relative flex h-screen w-full overflow-hidden bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200 p-2 sm:p-4 pt-16 sm:pt-[120px] pb-24 sm:pb-4 gap-4">
+      <div className="fixed top-3 right-3 sm:top-4 sm:right-4 z-50 flex items-center gap-2 sm:gap-3">
         <MailTodoPill />
         <Button
           type="button"
           variant="ghost"
           onClick={() => setSearchOpen(true)}
-          className="h-16 w-16 rounded-full border-[1px] shadow-lg text-slate-600 transition-all duration-200 ease-out hover:scale-110 hover:shadow-xl hover:text-slate-800 bg-[#ececeb]/95 backdrop-blur-sm"
+          className="h-11 w-11 sm:h-16 sm:w-16 rounded-full border-[1px] shadow-md sm:shadow-lg text-slate-600 transition-all duration-200 ease-out hover:scale-110 hover:shadow-xl hover:text-slate-800 bg-[#ececeb]/95 backdrop-blur-sm p-0 flex items-center justify-center"
           aria-label="Open goal search"
         >
-          <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
+          <img src={SearchIcon} alt="Search" className="h-5 w-5 sm:h-8 sm:w-8 opacity-60" />
         </Button>
       </div>
       <div className="flex min-h-0 w-full flex-col gap-4">

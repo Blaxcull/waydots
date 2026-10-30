@@ -547,10 +547,10 @@ const MonthView = () => {
 
   return (
     <div className="h-full w-full bg-[#f3f3f2] flex items-center justify-center overflow-hidden select-none">
-      <div className="h-[100%] w-[100%] rounded-l-2xl bg-[radial-gradient(circle_at_18%_0%,#ffffff_0%,#ececeb_34%,#dfdfdc_100%)] shadow-xl flex flex-col overflow-hidden text-neutral-900 antialiased" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif' }}>
+      <div className="h-[100%] w-[100%] rounded-none sm:rounded-l-2xl bg-[radial-gradient(circle_at_18%_0%,#ffffff_0%,#ececeb_34%,#dfdfdc_100%)] shadow-xl flex flex-col overflow-hidden text-neutral-900 antialiased pb-20 sm:pb-0" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif' }}>
       {/* Title bar */}
-      <div className="px-9 pt-32 pb-5 shrink-0">
-        <h1 aria-label={`${format(displayDate, "MMMM")} ${format(displayDate, "yyyy")}`} className="text-6xl pb-0 font-semibold text-neutral-800 tracking-tight">
+      <div className="px-4 pt-16 pb-3 sm:px-9 sm:pt-32 sm:pb-5 shrink-0">
+        <h1 aria-label={`${format(displayDate, "MMMM")} ${format(displayDate, "yyyy")}`} className="text-3xl sm:text-6xl pb-0 font-semibold text-neutral-800 tracking-tight">
           <span className="text-black">
             {format(displayDate, "MMMM")},
           </span>
@@ -562,15 +562,15 @@ const MonthView = () => {
       </div>
 
       {/* Weekday header */}
-      <div className="grid grid-cols-7 overflow-hidden rounded-t-[28px] border border-black/80 bg-[linear-gradient(180deg,#252421_0%,#10100f_100%)] shadow-[0_14px_30px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.13),inset_0_-1px_0_rgba(255,255,255,0.06)]">
+      <div className="grid grid-cols-7 overflow-hidden rounded-t-2xl sm:rounded-t-[28px] border border-black/80 bg-[linear-gradient(180deg,#252421_0%,#10100f_100%)] shadow-[0_14px_30px_rgba(0,0,0,0.16),inset_0_1px_0_rgba(255,255,255,0.13),inset_0_-1px_0_rgba(255,255,255,0.06)]">
         {WEEKDAY_LABELS.map((label, index) => {
           const isWeekend = index === 0 || index === 6
           return (
             <div
               key={label}
-              className="flex items-center justify-center border-r border-white/10 py-3.5 text-center last:border-r-0"
+              className="flex items-center justify-center border-r border-white/10 py-2 sm:py-3.5 text-center last:border-r-0"
             >
-              <div className={`text-[13px] font-bold uppercase tracking-[0.18em] ${isWeekend ? "text-white/45" : "text-white/85"}`}>
+              <div className={`text-[10px] sm:text-[13px] font-bold uppercase tracking-[0.12em] sm:tracking-[0.18em] ${isWeekend ? "text-white/45" : "text-white/85"}`}>
                 {label}
               </div>
             </div>
@@ -579,7 +579,7 @@ const MonthView = () => {
       </div>
 
       {/* Calendar grid */}
-      <div className="flex flex-1 flex-col overflow-hidden rounded-b-[28px] border-x border-b border-[#c9c6bd] bg-[#c9c6bd] shadow-[0_18px_40px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.35)]" style={{ gap: 1 }}>
+      <div className="flex flex-1 flex-col overflow-hidden rounded-b-2xl sm:rounded-b-[28px] border-x border-b border-[#c9c6bd] bg-[#c9c6bd] shadow-[0_18px_40px_rgba(0,0,0,0.08),inset_0_1px_0_rgba(255,255,255,0.35)]" style={{ gap: 1 }}>
         {visibleWeeks.map((week, weekIndex) => {
           const weekLayout = weekLayouts[weekIndex]
           const isLastWeek = weekIndex === visibleWeeks.length - 1
