@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Plus, Calendar, Trash2, ListChecks, Check, Sun, Flag } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Plus, Calendar, Trash2, ListChecks, Check, Sun, Flag, X } from "lucide-react";
 import { format } from "date-fns";
 import { useTasksStore, type TaskItem } from "@/store/tasksStore";
 import { TaskSidebar } from "./TaskSidebar";
@@ -21,14 +21,45 @@ export default function TaskView() {
   const [creatingSectionId, setCreatingSectionId] = useState<string | null>(null);
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [editingTitleText, setEditingTitleText] = useState("");
+  const [completedToast, setCompletedToast] = useState<{ id: string; title: string } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void fetchTasks();
   }, [fetchTasks]);
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleToggle = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    const task = tasks.find((t) => t.id === id);
+    const willBeCompleted = !task?.completed;
     toggleTask(id);
+
+    if (willBeCompleted && task) {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+      setCompletedToast({ id: task.id, title: task.title });
+      toastTimerRef.current = setTimeout(() => {
+        setCompletedToast(null);
+      }, 4500);
+    }
+  };
+
+  const handleUndoComplete = () => {
+    if (!completedToast) return;
+    toggleTask(completedToast.id);
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+    }
+    setCompletedToast(null);
   };
 
   const handleOpenTaskSidebar = (task: TaskItem) => {
@@ -523,6 +554,50 @@ export default function TaskView() {
         initialSectionId={creatingSectionId}
         initialView={activeView}
       />
+
+      {/* Task Completed Notification Toast (Bottom Left) */}
+      {completedToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-20 sm:bottom-6 left-4 sm:left-6 z-50 flex items-center gap-2.5 sm:gap-3 rounded-full bg-[#18181b]/95 text-white pl-3.5 pr-2.5 py-2 sm:py-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] border border-white/10 backdrop-blur-xl transition-all animate-in fade-in slide-in-from-bottom-3 duration-200 select-none"
+        >
+          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
+            <Check className="h-3 w-3 stroke-[2.5]" />
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-neutral-400 font-medium">Completed</span>
+            {completedToast.title && (
+              <span className="font-semibold text-neutral-100 max-w-[160px] sm:max-w-[240px] truncate">
+                &ldquo;{completedToast.title}&rdquo;
+              </span>
+            )}
+          </div>
+
+          <div className="h-3.5 w-px bg-white/15 mx-0.5" />
+
+          <button
+            type="button"
+            onClick={handleUndoComplete}
+            className="cursor-pointer text-xs font-semibold text-neutral-200 hover:text-white px-2.5 py-1 rounded-full hover:bg-white/10 active:scale-95 transition-all"
+          >
+            Undo
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+              setCompletedToast(null);
+            }}
+            aria-label="Dismiss notification"
+            className="p-1 text-neutral-400 hover:text-neutral-200 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
