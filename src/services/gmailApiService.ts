@@ -34,6 +34,17 @@ export async function connectGmailAccount(): Promise<{ error?: string }> {
  */
 export async function getGoogleProviderToken(): Promise<string | null> {
   try {
+    // 1. Immediately extract from URL hash if returning from Google OAuth redirect
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""))
+      const hashProviderToken = hashParams.get("provider_token")
+      if (hashProviderToken) {
+        localStorage.setItem("google_provider_token", hashProviderToken)
+        return hashProviderToken
+      }
+    }
+
+    // 2. Check Supabase session
     const { data } = await supabase.auth.getSession()
     const token = data.session?.provider_token
     if (token) {
@@ -90,6 +101,26 @@ export async function fetchTop20GmailMessages(
 
   if (messageItems.length === 0) {
     return []
+  }
+
+  let effectiveRecipient = recipientEmail
+  if (!effectiveRecipient) {
+    try {
+      const userRes = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+      if (userRes.ok) {
+        const userData = await userRes.json()
+        if (userData?.email) {
+          effectiveRecipient = userData.email
+          if (typeof window !== "undefined") {
+            localStorage.setItem("user_email", userData.email)
+          }
+        }
+      }
+    } catch {
+      // Ignore userinfo lookup errors
+    }
   }
 
   // Fetch full details for the top messages in parallel (batches of 5 to avoid throttling)
@@ -163,7 +194,7 @@ export async function fetchTop20GmailMessages(
         subject,
         senderName,
         senderEmail,
-        recipientEmail: recipientEmail || "you@waydots.com",
+        recipientEmail: effectiveRecipient || "you@waydots.com",
         body,
         timestamp,
         unread,

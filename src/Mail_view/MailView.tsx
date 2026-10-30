@@ -24,6 +24,7 @@ import {
 import { useEmailStore, type Email, type EmailPriority } from "@/store/emailStore"
 import { useAuthStore } from "@/store/authStore"
 import { useEventsStore } from "@/store/eventsStore"
+import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import {
   classifyAndSortEmailsWithGemini,
@@ -116,6 +117,7 @@ export default function MailView() {
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
   const [isGmailSyncing, setIsGmailSyncing] = useState(false)
   const [needsGmailAuth, setNeedsGmailAuth] = useState(false)
+  const [isGmailAuthorizing, setIsGmailAuthorizing] = useState(false)
 
   // Selection state (like Gmail)
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([])
@@ -474,16 +476,17 @@ export default function MailView() {
       }
 
       const liveEmails = await fetchTop20GmailMessages(token, loggedInEmail || undefined)
-      if (liveEmails.length > 0) {
-        setEmails(liveEmails)
-        setNeedsGmailAuth(false)
-        if (typeof window !== "undefined") {
-          const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
-          localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
+      setEmails(liveEmails)
+      setNeedsGmailAuth(false)
+      if (typeof window !== "undefined") {
+        const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+        localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
+        if (window.location.hash.includes("access_token") || window.location.hash.includes("provider_token")) {
+          window.history.replaceState({}, document.title, window.location.pathname)
         }
-        if (!isSilent) {
-          triggerToast(`Synced ${liveEmails.length} emails from Gmail`)
-        }
+      }
+      if (!isSilent) {
+        triggerToast(`Synced ${liveEmails.length} emails from Gmail`)
       }
     } catch (err: any) {
       if (err?.message === "GMAIL_INSUFFICIENT_SCOPES" || err?.status === 403 || err?.status === 401) {
@@ -500,20 +503,37 @@ export default function MailView() {
 
   const handleGrantGmailAccess = async () => {
     try {
+      setIsGmailAuthorizing(true)
       if (typeof window !== "undefined") {
         localStorage.removeItem("google_provider_token")
       }
       const res = await connectGmailAccount()
       if (res.error) {
         triggerToast(res.error)
+        setIsGmailAuthorizing(false)
       }
     } catch (err: any) {
       triggerToast(err?.message || "Failed to initialize Google authorization")
+      setIsGmailAuthorizing(false)
     }
   }
 
   useEffect(() => {
     void syncGmailAutomatically(true)
+  }, [syncGmailAutomatically])
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.provider_token) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem("google_provider_token", session.provider_token)
+        }
+        void syncGmailAutomatically(false)
+      }
+    })
+    return () => {
+      authListener.subscription.unsubscribe()
+    }
   }, [syncGmailAutomatically])
 
   useEffect(() => {
@@ -834,15 +854,22 @@ export default function MailView() {
                 )}
 
                 {needsGmailAuth && !isGmailSyncing && (
-                  <button
-                    type="button"
-                    onClick={handleGrantGmailAccess}
-                    title="Grant Gmail permission to automatically sync emails for your account"
-                    className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
-                  >
-                    <GoogleIcon className="h-3.5 w-3.5" />
-                    <span>Authorize Gmail Sync</span>
-                  </button>
+                  isGmailAuthorizing ? (
+                    <div className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-3 py-1.5 text-xs font-semibold shadow-xs">
+                      <span className="h-3 w-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>Connecting Google...</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGrantGmailAccess}
+                      title="Grant Gmail permission to automatically sync emails for your account"
+                      className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                    >
+                      <GoogleIcon className="h-3.5 w-3.5" />
+                      <span>Authorize Gmail Sync</span>
+                    </button>
+                  )
                 )}
               </div>
 
@@ -1014,14 +1041,21 @@ export default function MailView() {
                       : `No emails matching current criteria in ${folderTitle}`}
                   </p>
                   {needsGmailAuth && (
-                    <button
-                      type="button"
-                      onClick={handleGrantGmailAccess}
-                      className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm"
-                    >
-                      <GoogleIcon className="h-3.5 w-3.5" />
-                      <span>Authorize Gmail Sync</span>
-                    </button>
+                    isGmailAuthorizing ? (
+                      <div className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-xs font-semibold shadow-sm">
+                        <span className="h-3.5 w-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        <span>Connecting to Google...</span>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleGrantGmailAccess}
+                        className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                      >
+                        <GoogleIcon className="h-3.5 w-3.5" />
+                        <span>Authorize Gmail Sync</span>
+                      </button>
+                    )
                   )}
                 </div>
               ) : (
