@@ -465,42 +465,6 @@ export default function MailView() {
     }
   }, [loggedInEmail, setEmails])
 
-  // Automatically fetch & sync the latest Gmail emails for the logged-in mail id
-  const syncGmailAutomatically = useCallback(async (isSilent = true) => {
-    try {
-      setIsGmailSyncing(true)
-      const token = await getGoogleProviderToken()
-      if (!token) {
-        setNeedsGmailAuth(true)
-        return
-      }
-
-      const liveEmails = await fetchTop20GmailMessages(token, loggedInEmail || undefined)
-      setEmails(liveEmails)
-      setNeedsGmailAuth(false)
-      if (typeof window !== "undefined") {
-        const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
-        localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
-        if (window.location.hash.includes("access_token") || window.location.hash.includes("provider_token")) {
-          window.history.replaceState({}, document.title, window.location.pathname)
-        }
-      }
-      if (!isSilent) {
-        triggerToast(`Synced ${liveEmails.length} emails from Gmail`)
-      }
-    } catch (err: any) {
-      if (err?.message === "GMAIL_INSUFFICIENT_SCOPES" || err?.status === 403 || err?.status === 401) {
-        setNeedsGmailAuth(true)
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("google_provider_token")
-        }
-      }
-      console.warn("Auto Gmail sync error:", err)
-    } finally {
-      setIsGmailSyncing(false)
-    }
-  }, [loggedInEmail, setEmails])
-
   const handleGrantGmailAccess = async () => {
     try {
       setIsGmailAuthorizing(true)
@@ -517,6 +481,54 @@ export default function MailView() {
       setIsGmailAuthorizing(false)
     }
   }
+
+  // Automatically fetch & sync the latest Gmail emails for the logged-in mail id
+  const syncGmailAutomatically = useCallback(async (isSilent = true) => {
+    try {
+      setIsGmailSyncing(true)
+      const token = await getGoogleProviderToken()
+      if (!token) {
+        setNeedsGmailAuth(true)
+        if (!isSilent) {
+          triggerToast("Connecting to Google to grant Gmail read access...")
+          await handleGrantGmailAccess()
+        }
+        return
+      }
+
+      const liveEmails = await fetchTop20GmailMessages(token, loggedInEmail || undefined)
+      setEmails(liveEmails)
+      setNeedsGmailAuth(false)
+      if (typeof window !== "undefined") {
+        const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+        localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
+        if (window.location.hash.includes("access_token") || window.location.hash.includes("provider_token")) {
+          window.history.replaceState({}, document.title, window.location.pathname)
+        }
+      }
+      if (!isSilent) {
+        triggerToast(`Successfully fetched ${liveEmails.length} emails from Gmail!`)
+      }
+    } catch (err: any) {
+      if (err?.message === "GMAIL_INSUFFICIENT_SCOPES" || err?.status === 403 || err?.status === 401) {
+        setNeedsGmailAuth(true)
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("google_provider_token")
+        }
+        if (!isSilent) {
+          triggerToast("Gmail read permission required. Opening Google authorization...")
+          await handleGrantGmailAccess()
+        }
+      } else {
+        if (!isSilent) {
+          triggerToast(err?.message || "Failed to fetch emails from Gmail")
+        }
+      }
+      console.warn("Gmail sync error:", err)
+    } finally {
+      setIsGmailSyncing(false)
+    }
+  }, [loggedInEmail, setEmails])
 
   useEffect(() => {
     void syncGmailAutomatically(true)
@@ -846,12 +858,30 @@ export default function MailView() {
                   <span>Priority Wise</span>
                 </button>
 
-                {isGmailSyncing && (
-                  <div className="flex items-center gap-1.5 rounded-full border border-gray-300/60 bg-white/70 px-3 py-1 text-xs text-neutral-600 shrink-0">
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                    <span className="text-[11px] font-medium">Syncing...</span>
-                  </div>
-                )}
+                {/* Fetch from Gmail button */}
+                <button
+                  type="button"
+                  onClick={() => syncGmailAutomatically(false)}
+                  disabled={isGmailSyncing || isGmailAuthorizing}
+                  title="Fetch latest emails from your Gmail inbox"
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer ${
+                    isGmailSyncing
+                      ? "border-blue-400 bg-blue-50 text-blue-700 shadow-xs"
+                      : "border-gray-300/80 bg-[#e7e7e6] text-neutral-700 hover:bg-[#dddddc] hover:text-neutral-900"
+                  }`}
+                >
+                  {isGmailSyncing ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-blue-600/40 border-t-blue-600 rounded-full animate-spin" />
+                      <span>Fetching Emails...</span>
+                    </>
+                  ) : (
+                    <>
+                      <GoogleIcon className="h-3.5 w-3.5" />
+                      <span>Fetch from Gmail</span>
+                    </>
+                  )}
+                </button>
 
                 {needsGmailAuth && !isGmailSyncing && (
                   isGmailAuthorizing ? (
@@ -1038,25 +1068,31 @@ export default function MailView() {
                   <p className="mt-3 text-sm font-medium text-neutral-500">
                     {needsGmailAuth
                       ? "Gmail authorization required to sync your inbox"
-                      : `No emails matching current criteria in ${folderTitle}`}
+                      : `No emails found in ${folderTitle}`}
                   </p>
-                  {needsGmailAuth && (
-                    isGmailAuthorizing ? (
-                      <div className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 text-white px-5 py-2 text-xs font-semibold shadow-sm">
-                        <span className="h-3.5 w-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                        <span>Connecting to Google...</span>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleGrantGmailAccess}
-                        className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm"
-                      >
-                        <GoogleIcon className="h-3.5 w-3.5" />
-                        <span>Authorize Gmail Sync</span>
-                      </button>
-                    )
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (needsGmailAuth) {
+                        void handleGrantGmailAccess()
+                      } else {
+                        void syncGmailAutomatically(false)
+                      }
+                    }}
+                    disabled={isGmailSyncing || isGmailAuthorizing}
+                    className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <GoogleIcon className="h-3.5 w-3.5" />
+                    <span>
+                      {isGmailSyncing
+                        ? "Fetching Emails..."
+                        : isGmailAuthorizing
+                        ? "Connecting to Google..."
+                        : needsGmailAuth
+                        ? "Authorize Gmail Sync"
+                        : "Fetch Emails from Gmail"}
+                    </span>
+                  </button>
                 </div>
               ) : (
                 displayedEmails.map((email) => {

@@ -52,11 +52,12 @@ function LoginContent() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          scopes: 'email profile',
+          scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
           redirectTo: `${redirectOrigin}/today`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
           },
         },
       })
