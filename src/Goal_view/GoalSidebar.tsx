@@ -142,14 +142,14 @@ const GoalSidebar = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onToggle}
-              className="fixed inset-0 z-40 bg-transparent"
+              className="fixed inset-0 z-[20090] bg-transparent"
             />
             <motion.div
               initial={{ x: 600 }}
               animate={{ x: 0 }}
               exit={{ x: 600 }}
               transition={{ duration: 0.18, ease: [0.25, 0.1, 0.25, 1] }}
-              className="fixed right-0 top-0 bottom-0 z-50 flex w-[600px] flex-col overflow-hidden border-l border-gray-300 bg-neutral-100 text-neutral-800"
+              className="fixed right-0 top-0 bottom-0 z-[20100] flex w-[600px] flex-col overflow-hidden border-l border-gray-300 bg-neutral-100 text-neutral-800"
             >
               <div className="px-4 pb-3 pt-4 shrink-0">
                 <div className="flex items-center justify-between">

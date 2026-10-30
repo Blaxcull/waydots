@@ -58,6 +58,12 @@ describe("MailTodoPill", () => {
     expect(mailBtn.className).toContain("bg-[#dddddd]")
   })
 
+  it("shows active style when on /todos route", () => {
+    renderWithRouter(<MailTodoPill />, ["/todos"])
+    const todoBtn = screen.getByRole("button", { name: "To-do list" })
+    expect(todoBtn.className).toContain("bg-[#dddddd]")
+  })
+
   it("respects controlled active state", () => {
     const { rerender } = render(
       <MemoryRouter>

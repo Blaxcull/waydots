@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import { cn } from "@/lib/utils"
+import { useTimeStore } from "@/store/timeStore"
 
 const progressIcon = "/assets/progress.png"
 
@@ -57,13 +58,18 @@ export function MailTodoPill({
 }: MailTodoPillProps) {
   const navigate = useNavigate()
   const location = useLocation()
+  const selectedDate = useTimeStore((state) => state.selectedDate)
   const [internalActive, setInternalActive] = useState<"mail" | "todo" | null>(null)
   const [imageError, setImageError] = useState(false)
 
   const isMailRoute = location.pathname === "/mail"
+  const isTodoRoute = location.pathname === "/todos"
   const mailActive = isMailActive !== undefined ? isMailActive : (isMailRoute || internalActive === "mail")
-  const todoActive = isTodoActive !== undefined ? isTodoActive : internalActive === "todo"
+  const todoActive = isTodoActive !== undefined ? isTodoActive : (isTodoRoute || internalActive === "todo")
   const anyActive = mailActive || todoActive
+
+  const calendarDate = selectedDate || new Date()
+  const calendarPath = `/day/${calendarDate.getFullYear()}/${calendarDate.getMonth() + 1}/${calendarDate.getDate()}`
 
   const handleMailClick = () => {
     if (onMailClick) {
@@ -77,8 +83,11 @@ export function MailTodoPill({
   }
 
   const handleTodoClick = () => {
-    setInternalActive((prev) => (prev === "todo" ? null : "todo"))
-    onTodoClick?.()
+    if (onTodoClick) {
+      onTodoClick()
+    } else {
+      navigate(isTodoRoute ? calendarPath : "/todos")
+    }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("waydots:open-tasks"))
     }

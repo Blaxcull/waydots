@@ -8,6 +8,7 @@ import { ResetPassword } from '@/pages/ResetPassword'
 import { Signup } from '@/pages/Signup'
 import AnalysisView from '@/Analysis_view/AnalysisView'
 import MailView from '@/Mail_view/MailView'
+import TaskView from '@/Task_view/TaskView'
 import type { SubscriptionPlan, SubscriptionStatus } from '@/hooks/useSubscription'
 
 interface AppRoutesProps {
@@ -40,6 +41,7 @@ export function AppRoutes({ isAuthenticated, subscriptionPlan, subscriptionStatu
       <Route path="/goals" element={isAuthenticated ? <GoalView /> : <Navigate to="/login" replace />} />
       <Route path="/analysis" element={isAuthenticated ? <AnalysisView /> : <Navigate to="/login" replace />} />
       <Route path="/mail" element={isAuthenticated ? <MailView /> : <Navigate to="/login" replace />} />
+      <Route path="/todos" element={isAuthenticated ? <TaskView /> : <Navigate to="/login" replace />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/signup" element={isAuthenticated ? <Navigate to="/" replace /> : <Signup />} />
       <Route path="/reset-password" element={<ResetPassword />} />

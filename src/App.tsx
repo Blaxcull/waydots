@@ -9,6 +9,7 @@ import TimeUpdater from '@/components/TimeUpdater'
 import { TopBarLeft } from '@/components/TopBarLeft'
 import { ViewSwitcher } from '@/components/ViewSwitcher'
 import { useAuthStore } from '@/store/authStore'
+import { useTasksStore } from '@/store/tasksStore'
 
 function App() {
   const initializeAuth = useAuthStore((state) => state.initialize)
@@ -22,10 +23,12 @@ function App() {
   const isGoalView = location.pathname === '/goals'
   const isAnalysisView = location.pathname === '/analysis'
   const isMailView = location.pathname === '/mail'
+  const isTodoView = location.pathname === '/todos'
   const isHomePage = location.pathname === '/'
   const isCheckoutPage = location.pathname === '/checkout'
   const isShellHiddenPage = isAuthPage || isHomePage || isCheckoutPage
-  const isSidebarlessPage = isGoalView || isAnalysisView || isMailView
+  const isSidebarlessPage = isGoalView || isAnalysisView || isMailView || isTodoView
+  const isTaskSidebarOpen = useTasksStore((state) => state.isSidebarOpen)
   const {
     currentView,
     setCurrentView,
@@ -76,7 +79,7 @@ function App() {
         />
       )}
 
-      {(showFloatingSidebarButton || isAnalysisView || isMailView) && (
+      {(showFloatingSidebarButton || isAnalysisView || isMailView || (isTodoView && !isTaskSidebarOpen)) && (
         <FloatingSidebarControls
           isHoverVisible={isSidebarHoverVisible}
           onHoverVisibleChange={setIsSidebarHoverVisible}

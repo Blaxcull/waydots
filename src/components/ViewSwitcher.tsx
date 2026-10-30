@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useTimeStore } from "@/store/timeStore"
 import { useEmailStore, type MailFolder } from "@/store/emailStore"
+import { useTasksStore, type TaskView as TaskViewType } from "@/store/tasksStore"
 
 export type ViewType = "day" | "week" | "month" | "year"
 
@@ -12,6 +13,7 @@ interface ViewSwitcherProps {
 }
 
 const views: ViewType[] = ["day", "week", "month", "year"]
+const taskViews: TaskViewType[] = ["inbox", "today", "upcoming", "completed"]
 
 const mailTabs: { id: MailFolder; label: string }[] = [
   { id: "inbox", label: "Inbox" },
@@ -34,13 +36,17 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   const selectedDate = useTimeStore((state) => state.selectedDate)
   const routeActiveView = getActiveViewFromPathname(location.pathname)
   const isMailView = location.pathname === "/mail"
+  const isTodoView = location.pathname === "/todos"
   const activeFolder = useEmailStore((state) => state.activeFolder)
   const setActiveFolder = useEmailStore((state) => state.setActiveFolder)
+  const activeTaskView = useTasksStore((state) => state.activeView)
+  const setActiveTaskView = useTasksStore((state) => state.setActiveView)
 
   const shouldClearSelection =
     location.pathname === "/analysis" ||
     location.pathname === "/goals" ||
-    location.pathname === "/mail"
+    location.pathname === "/mail" ||
+    location.pathname === "/todos"
   const activeView = routeActiveView ?? (shouldClearSelection ? null : currentView)
 
   const handleViewClick = (view: ViewType) => {
@@ -93,6 +99,47 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 </Button>
 
                 {i < mailTabs.length - 1 && (
+                  <div
+                    className={cn(
+                      "w-px h-8 bg-gray-300 mx-1 transition-opacity duration-200",
+                      isActive || nextActive ? "opacity-0" : "opacity-100"
+                    )}
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
+  // When on /todos, render the 4 task sections: Inbox, Today, Upcoming, Completed
+  if (isTodoView) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+        <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto rounded-full border border-black/5 bg-[#ececeb] p-2 shadow-sm">
+          {taskViews.map((tab, i) => {
+            const isActive = activeTaskView === tab
+            const nextTab = taskViews[i + 1]
+            const nextActive = nextTab ? activeTaskView === nextTab : false
+
+            return (
+              <div key={tab} className="flex items-center">
+                <Button
+                  onClick={() => setActiveTaskView(tab)}
+                  className={cn(
+                    "w-[125px] rounded-full py-6 text-xl font-semibold capitalize",
+                    "transition-all duration-200 ease-out",
+                    "bg-transparent text-neutral-600",
+                    "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
+                    isActive && "bg-[#dddddd] text-neutral-900 shadow-sm"
+                  )}
+                >
+                  {tab}
+                </Button>
+
+                {i < taskViews.length - 1 && (
                   <div
                     className={cn(
                       "w-px h-8 bg-gray-300 mx-1 transition-opacity duration-200",
