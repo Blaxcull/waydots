@@ -16,7 +16,7 @@ export function SearchControlButton({
       className={
         inline
           ? "flex items-center gap-2 sm:gap-3"
-          : "pointer-events-auto fixed right-3 top-3 sm:right-4 sm:top-4 z-[20050] flex items-center gap-2 sm:gap-3"
+          : "pointer-events-auto fixed right-3.5 top-3.5 sm:right-4 sm:top-4 z-[20050] flex items-center gap-2 sm:gap-3"
       }
     >
       <MailTodoPill />

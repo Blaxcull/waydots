@@ -176,7 +176,7 @@ function Hero({
 
           <motion.h1 
             variants={fadeInUp}
-            className="mt-10 text-6xl md:text-8xl font-bold tracking-[-0.04em] leading-[0.95]"
+            className="mt-10 text-4xl sm:text-6xl md:text-8xl font-bold tracking-[-0.04em] leading-[0.98] sm:leading-[0.95]"
           >
             Turn plans into
             <br />
@@ -186,7 +186,7 @@ function Hero({
 
           <motion.p 
             variants={fadeInUp}
-            className="mt-8 text-lg text-muted-foreground max-w-xl mx-auto text-balance"
+            className="mt-8 text-base sm:text-lg text-muted-foreground max-w-xl mx-auto text-balance"
           >
             Waydots links every event to a goal — so you can see exactly where
             your time goes, and how each hour moves you forward.
@@ -194,17 +194,17 @@ function Hero({
 
           <motion.div 
             variants={fadeInUp}
-            className="mt-10 flex items-center justify-center gap-3"
+            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3"
           >
             <Link
               to={isAuthenticated ? "/today" : "/signup"}
-              className="inline-flex items-center gap-2 rounded-full bg-foreground text-background px-7 h-12 text-base font-medium hover:opacity-90 transition"
+              className="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-full bg-foreground text-background px-7 h-12 text-base font-medium hover:opacity-90 transition"
             >
               {isAuthenticated ? "Go to Calendar" : "Start free"} <ArrowRight className="h-4 w-4" />
             </Link>
             <a
               href="#how"
-              className="inline-flex items-center rounded-full border border-border bg-card px-7 h-12 text-base font-medium hover:bg-secondary transition"
+              className="inline-flex w-full sm:w-auto justify-center items-center rounded-full border border-border bg-card px-7 h-12 text-base font-medium hover:bg-secondary transition"
             >
               See how it works
             </a>
@@ -268,7 +268,7 @@ function SectionHead({
           {kicker}
         </div>
       )}
-      <h2 className="mt-3 text-4xl md:text-5xl font-bold tracking-[-0.03em]">{title}</h2>
+      <h2 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-bold tracking-[-0.03em]">{title}</h2>
       {sub && <p className="mt-4 text-muted-foreground text-lg">{sub}</p>}
     </motion.div>
   );
@@ -297,7 +297,7 @@ function How() {
     },
   ];
   return (
-    <section id="how" className="mx-auto max-w-5xl px-6 py-28">
+    <section id="how" className="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28">
       <SectionHead
         kicker=""
         title={
@@ -361,7 +361,7 @@ function How() {
 function Features() {
   return (
     <section id="features" className="bg-secondary/40 border-y border-border/70">
-      <div className="mx-auto max-w-6xl px-6 py-28">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-20 sm:py-28">
         <SectionHead
           kicker=""
           title={
@@ -377,7 +377,7 @@ function Features() {
           whileInView="animate"
           viewport={{ once: true, margin: "-50px" }}
           variants={staggerContainer}
-          className="mt-14 grid grid-cols-1 md:grid-cols-6 auto-rows-[180px] gap-4"
+          className="mt-14 grid grid-cols-1 md:grid-cols-6 auto-rows-auto md:auto-rows-[180px] gap-4"
         >
           {/* Big: goal-linked events */}
           <motion.div
@@ -571,48 +571,56 @@ function Compare() {
     );
   return (
     <section id="compare" className="bg-secondary/40 border-y border-border/70">
-      <div className="mx-auto max-w-5xl px-6 py-28">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28">
         <SectionHead kicker="" title="Why Waydots feels different." />
+        <div className="mt-4 md:hidden flex items-center justify-center gap-1.5 text-xs font-semibold text-muted-foreground/75">
+          <span>Swipe horizontally to compare</span>
+          <span>&rarr;</span>
+        </div>
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-          className="mt-14 overflow-hidden rounded-3xl border border-border bg-card"
+          className="mt-6 sm:mt-14 overflow-hidden rounded-3xl border border-border bg-card"
           style={{ boxShadow: "var(--shadow-soft)" }}
         >
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                <th />
-                {cols.map((c, i) => (
-                  <th
-                    key={c}
-                    className={`p-5 text-center ${
-                      i === 0 ? "text-foreground" : "text-muted-foreground"
-                    }`}
-                  >
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(([label, ...vals]) => (
-                <tr key={label} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors group">
-                  <td className="p-5 font-semibold text-foreground/80">{label}</td>
-                  {vals.map((v, i) => (
-                    <td
-                      key={i}
-                      className={`p-5 text-center ${i === 0 ? "bg-foreground/[0.03]" : ""}`}
+          <div className="overflow-x-auto no-scrollbar">
+            <table className="w-full min-w-[560px] sm:min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <th className="sticky left-0 bg-card z-10 shadow-[1px_0_0_rgba(0,0,0,0.06)] sm:shadow-none" />
+                  {cols.map((c, i) => (
+                    <th
+                      key={c}
+                      className={`p-3.5 sm:p-5 text-center whitespace-nowrap ${
+                        i === 0 ? "text-foreground font-bold" : "text-muted-foreground"
+                      }`}
                     >
-                      {cell(v)}
-                    </td>
+                      {c}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map(([label, ...vals]) => (
+                  <tr key={label} className="border-b border-border last:border-0 hover:bg-surface/50 transition-colors group">
+                    <td className="sticky left-0 bg-card p-3.5 sm:p-5 font-semibold text-foreground/80 z-10 whitespace-nowrap shadow-[1px_0_0_rgba(0,0,0,0.06)] sm:shadow-none">
+                      {label}
+                    </td>
+                    {vals.map((v, i) => (
+                      <td
+                        key={i}
+                        className={`p-3.5 sm:p-5 text-center ${i === 0 ? "bg-foreground/[0.03]" : ""}`}
+                      >
+                        {cell(v)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </motion.div>
       </div>
     </section>
@@ -622,7 +630,7 @@ function Compare() {
 /* ---------- Pricing ---------- */
 function Pricing({ isAuthenticated, subscriptionPlan, isPro }: { isAuthenticated: boolean; subscriptionPlan: SubscriptionPlan; isPro: boolean }) {
   return (
-    <section id="pricing" className="mx-auto max-w-5xl px-6 py-28">
+    <section id="pricing" className="mx-auto max-w-5xl px-4 sm:px-6 py-20 sm:py-28">
       <SectionHead
         kicker=""
         title="Start free. Grow into Pro."
@@ -708,13 +716,13 @@ function Pricing({ isAuthenticated, subscriptionPlan, isPro }: { isAuthenticated
 /* ---------- CTA ---------- */
 function CTA({ isAuthenticated }: { isAuthenticated: boolean }) {
   return (
-    <section className="mx-auto max-w-5xl px-6 pb-28">
+    <section className="mx-auto max-w-5xl px-4 sm:px-6 pb-20 sm:pb-28">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-[2rem] bg-foreground text-background px-8 py-20 text-center group"
+        className="relative overflow-hidden rounded-[2rem] bg-foreground text-background px-5 sm:px-8 py-14 sm:py-20 text-center group"
         style={{ boxShadow: "var(--shadow-soft)" }}
       >
         <div
@@ -722,7 +730,7 @@ function CTA({ isAuthenticated }: { isAuthenticated: boolean }) {
           className="absolute -top-32 left-1/2 -translate-x-1/2 h-[400px] w-[700px] rounded-full opacity-30 blur-3xl"
           style={{ background: "radial-gradient(circle, var(--accent) 0%, transparent 70%)" }}
         />
-        <h2 className="relative text-4xl md:text-6xl font-bold tracking-[-0.03em] leading-tight">
+        <h2 className="relative text-3xl sm:text-4xl md:text-6xl font-bold tracking-[-0.03em] leading-tight">
           Clarity over chaos.
         </h2>
         <p className="relative mt-5 text-lg opacity-70 max-w-xl mx-auto font-medium">

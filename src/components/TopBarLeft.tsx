@@ -315,7 +315,7 @@ export function TopBarLeft({ onAddClick }: TopBarLeftProps) {
         </Button>
       </div>
 
-      <div className={`fixed left-3 top-3 sm:left-4 sm:top-4 z-[20020] items-center gap-2 sm:gap-3 ${useCondensedNav ? "flex" : "hidden"}`}>
+      <div className={`fixed left-3.5 top-3.5 sm:left-4 sm:top-4 z-[20020] items-center gap-2 sm:gap-3 ${useCondensedNav ? "flex" : "hidden"}`}>
         <Button
           type="button"
           variant="ghost"

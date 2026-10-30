@@ -603,7 +603,7 @@ export default function MailView() {
       : "Sent"
 
   return (
-    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#f3f3f2] pt-16 sm:pt-[116px] px-2 sm:px-4 pb-24 sm:pb-4">
+    <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#f3f3f2] pt-[84px] sm:pt-[116px] px-2 sm:px-4 pb-24 sm:pb-4">
       {/* Gmail-Style Bottom-Left "Conversation moved to Trash" Toast with Undo (5s) */}
       {trashToast && (
         <div className="fixed bottom-6 left-6 z-50 flex items-center gap-4 rounded-lg bg-white px-4 py-3 text-sm text-neutral-800 shadow-[0_6px_24px_rgba(0,0,0,0.18)] border border-gray-200/90 select-none animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -778,10 +778,10 @@ export default function MailView() {
         {!selectedEmail ? (
           <div className="flex h-full w-full flex-col overflow-hidden bg-[#ececeb]">
             {/* Header: All | High (x) | Med (y) | Low (z) | Priority Wise */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-300/70 px-3 sm:px-6 py-3 bg-[#ececeb]">
-              <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar max-w-full pb-1 sm:pb-0">
+            <div className="flex items-center justify-between gap-3 border-b border-gray-300/70 px-3 sm:px-6 py-2.5 sm:py-3 bg-[#ececeb] overflow-hidden">
+              <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar w-full pb-1 sm:pb-0">
                 {/* Fast Priority Filter Pills: All | High | Med | Low */}
-                <div className="flex items-center rounded-full border border-gray-300/80 bg-[#dededc] p-1 shadow-inner">
+                <div className="flex items-center rounded-full border border-gray-300/80 bg-[#dededc] p-1 shadow-inner shrink-0">
                   <button
                     type="button"
                     onClick={() => setPriorityFilter("all")}
@@ -836,7 +836,7 @@ export default function MailView() {
                   type="button"
                   onClick={handleTogglePrioritySort}
                   title="Toggle priority ordering (High to Low)"
-                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer ${
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 ${
                     sortByPriority
                       ? "border-gray-400 bg-[#dddddd] text-neutral-900 shadow-xs"
                       : "border-gray-300/80 bg-[#e7e7e6] text-neutral-600 hover:bg-[#dddddc]"
@@ -847,7 +847,7 @@ export default function MailView() {
                 </button>
 
                 {isGmailSyncing && (
-                  <div className="flex items-center gap-1.5 rounded-full border border-gray-300/60 bg-white/70 px-3 py-1 text-xs text-neutral-600">
+                  <div className="flex items-center gap-1.5 rounded-full border border-gray-300/60 bg-white/70 px-3 py-1 text-xs text-neutral-600 shrink-0">
                     <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
                     <span className="text-[11px] font-medium">Syncing...</span>
                   </div>
@@ -855,7 +855,7 @@ export default function MailView() {
 
                 {needsGmailAuth && !isGmailSyncing && (
                   isGmailAuthorizing ? (
-                    <div className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-3 py-1.5 text-xs font-semibold shadow-xs">
+                    <div className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-3 py-1.5 text-xs font-semibold shadow-xs shrink-0">
                       <span className="h-3 w-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                       <span>Connecting Google...</span>
                     </div>
@@ -864,7 +864,7 @@ export default function MailView() {
                       type="button"
                       onClick={handleGrantGmailAccess}
                       title="Grant Gmail permission to automatically sync emails for your account"
-                      className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                      className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
                     >
                       <GoogleIcon className="h-3.5 w-3.5" />
                       <span>Authorize Gmail Sync</span>
@@ -1067,7 +1067,7 @@ export default function MailView() {
                     <div
                       key={email.id}
                       onClick={() => selectEmail(email.id)}
-                      className={`group flex w-full items-center gap-3.5 px-6 py-4 text-left transition-all duration-150 cursor-pointer ${
+                      className={`group w-full text-left transition-all duration-150 cursor-pointer ${
                         isChecked
                           ? "bg-[#dededc] border-l-2 border-neutral-700"
                           : isOpened
@@ -1075,124 +1075,221 @@ export default function MailView() {
                           : "bg-[#ececeb] opacity-100 hover:bg-[#f3f3f2]"
                       }`}
                     >
-                      {/* Selection Checkbox (like Gmail) */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toggleSelectEmail(email.id)
-                        }}
-                        className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all shrink-0 ${
-                          isChecked
-                            ? "border-neutral-900 bg-neutral-900 text-white"
-                            : "border-gray-300 bg-white/90 hover:border-gray-500"
-                        }`}
-                        title={isChecked ? "Deselect" : "Select"}
-                      >
-                        {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
-                      </button>
+                      {/* MOBILE VIEW (< md:): Multi-line clean card with avatar/sender on top, subject in middle, snippet below */}
+                      <div className="flex md:hidden flex-col gap-1.5 px-3.5 py-3 border-b border-gray-200/60">
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleSelectEmail(email.id)
+                              }}
+                              className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all shrink-0 ${
+                                isChecked
+                                  ? "border-neutral-900 bg-neutral-900 text-white"
+                                  : "border-gray-300 bg-white/90 hover:border-gray-500"
+                              }`}
+                              title={isChecked ? "Deselect" : "Select"}
+                            >
+                              {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                            </button>
 
-                      {/* Star & Priority-Colored Read/Unread Dot */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            toggleStarEmail(email.id)
-                          }}
-                          className="text-neutral-400 hover:text-amber-500 transition-colors p-1"
-                          title={email.starred ? "Unstar" : "Star"}
-                        >
-                          <Star
-                            className={`h-4 w-4 ${
-                              email.starred ? "text-amber-400 fill-amber-400" : ""
-                            }`}
-                          />
-                        </button>
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full shrink-0 transition-colors ${
-                            email.unread
-                              ? email.priority === "high"
-                                ? "bg-rose-500 shadow-2xs"
-                                : email.priority === "medium"
-                                ? "bg-amber-500 shadow-2xs"
-                                : "bg-emerald-500 shadow-2xs"
-                              : "bg-transparent"
-                          }`}
-                          title={email.unread ? `Unread (${email.priority.toUpperCase()} priority)` : "Read"}
-                        />
-                      </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleStarEmail(email.id)
+                              }}
+                              className="text-neutral-400 hover:text-amber-500 transition-colors p-0.5 shrink-0"
+                              title={email.starred ? "Unstar" : "Star"}
+                            >
+                              <Star
+                                className={`h-4 w-4 ${
+                                  email.starred ? "text-amber-400 fill-amber-400" : ""
+                                }`}
+                              />
+                            </button>
 
-                      {/* Sender */}
-                      <div className="flex items-center gap-3 w-44 shrink-0 min-w-0">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-xs text-neutral-700 shrink-0 shadow-xs">
-                          {email.senderName.charAt(0)}
-                        </div>
-                        <span
-                          className={`truncate text-sm ${
-                            email.unread
-                              ? "font-bold text-neutral-900"
-                              : "font-normal text-neutral-600"
-                          }`}
-                        >
-                          {email.senderName}
-                        </span>
-                      </div>
+                            <span
+                              className={`h-2.5 w-2.5 rounded-full shrink-0 transition-colors ${
+                                email.unread
+                                  ? email.priority === "high"
+                                    ? "bg-rose-500 shadow-2xs"
+                                    : email.priority === "medium"
+                                    ? "bg-amber-500 shadow-2xs"
+                                    : "bg-emerald-500 shadow-2xs"
+                                  : "bg-transparent"
+                              }`}
+                              title={email.unread ? `Unread (${email.priority.toUpperCase()} priority)` : "Read"}
+                            />
 
-                      {/* Subject, Snippet & Meeting Badges */}
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <span
-                          className={`shrink-0 text-sm ${
-                            email.unread
-                              ? "font-bold text-neutral-900"
-                              : "font-normal text-neutral-600"
-                          }`}
-                        >
-                          {email.subject}
-                        </span>
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-[10px] text-neutral-700 shrink-0">
+                              {email.senderName.charAt(0)}
+                            </div>
 
-                        {/* Meeting Timing & Duration Badge */}
-                        {email.meetingInfo?.hasMeeting && (
-                          <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-2xs">
-                            <Calendar className="h-3 w-3 text-neutral-600" />
-                            <span>
-                              {email.meetingInfo.duration
-                                ? email.meetingInfo.duration
-                                : "Meeting"}
-                              {email.meetingInfo.timing
-                                ? ` • ${email.meetingInfo.timing}`
-                                : ""}
+                            <span
+                              className={`truncate text-sm ${
+                                email.unread
+                                  ? "font-bold text-neutral-900"
+                                  : "font-medium text-neutral-700"
+                              }`}
+                            >
+                              {email.senderName}
                             </span>
-                          </span>
-                        )}
+                          </div>
 
-                        <span className="text-neutral-400">—</span>
-                        <span
-                          className={`truncate text-xs ${
-                            email.unread ? "text-neutral-600" : "text-neutral-400"
-                          }`}
-                        >
-                          {email.body.replace(/\n+/g, " ")}
-                        </span>
+                          <span className="shrink-0 text-xs font-medium text-neutral-400 tabular-nums">
+                            {email.timestamp}
+                          </span>
+                        </div>
+
+                        {/* Subject & optional meeting badge */}
+                        <div className="flex items-center gap-2 min-w-0 pl-7">
+                          <span
+                            className={`truncate text-sm ${
+                              email.unread ? "font-semibold text-neutral-900" : "font-normal text-neutral-800"
+                            }`}
+                          >
+                            {email.subject}
+                          </span>
+                          {email.meetingInfo?.hasMeeting && (
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white/90 px-2 py-0.5 text-[10px] font-medium text-neutral-700 shadow-2xs">
+                              <Calendar className="h-2.5 w-2.5 text-neutral-600" />
+                              <span>{email.meetingInfo.duration || "Meeting"}</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Body preview */}
+                        <div className="min-w-0 pl-7">
+                          <p className={`truncate text-xs ${email.unread ? "text-neutral-600" : "text-neutral-400"}`}>
+                            {email.body.replace(/\n+/g, " ")}
+                          </p>
+                        </div>
                       </div>
 
-                      {/* Right: Timestamp & Hover Delete Button */}
-                      <div className="relative flex items-center justify-end w-24 shrink-0">
-                        <span className="text-xs font-medium text-neutral-400 group-hover:opacity-0 transition-opacity tabular-nums">
-                          {email.timestamp}
-                        </span>
+                      {/* DESKTOP VIEW (md:): Original single-line layout preserved exactly */}
+                      <div className="hidden md:flex w-full items-center gap-3.5 px-6 py-4">
+                        {/* Selection Checkbox (like Gmail) */}
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            deleteEmail(email.id)
-                            showTrashToast([email], "Conversation moved to Trash.")
+                            toggleSelectEmail(email.id)
                           }}
-                          title="Delete"
-                          className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 active:scale-95"
+                          className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all shrink-0 ${
+                            isChecked
+                              ? "border-neutral-900 bg-neutral-900 text-white"
+                              : "border-gray-300 bg-white/90 hover:border-gray-500"
+                          }`}
+                          title={isChecked ? "Deselect" : "Select"}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
                         </button>
+
+                        {/* Star & Priority-Colored Read/Unread Dot */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleStarEmail(email.id)
+                            }}
+                            className="text-neutral-400 hover:text-amber-500 transition-colors p-1"
+                            title={email.starred ? "Unstar" : "Star"}
+                          >
+                            <Star
+                              className={`h-4 w-4 ${
+                                email.starred ? "text-amber-400 fill-amber-400" : ""
+                              }`}
+                            />
+                          </button>
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full shrink-0 transition-colors ${
+                              email.unread
+                                ? email.priority === "high"
+                                  ? "bg-rose-500 shadow-2xs"
+                                  : email.priority === "medium"
+                                  ? "bg-amber-500 shadow-2xs"
+                                  : "bg-emerald-500 shadow-2xs"
+                                : "bg-transparent"
+                            }`}
+                            title={email.unread ? `Unread (${email.priority.toUpperCase()} priority)` : "Read"}
+                          />
+                        </div>
+
+                        {/* Sender */}
+                        <div className="flex items-center gap-3 w-44 shrink-0 min-w-0">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-xs text-neutral-700 shrink-0 shadow-xs">
+                            {email.senderName.charAt(0)}
+                          </div>
+                          <span
+                            className={`truncate text-sm ${
+                              email.unread
+                                ? "font-bold text-neutral-900"
+                                : "font-normal text-neutral-600"
+                            }`}
+                          >
+                            {email.senderName}
+                          </span>
+                        </div>
+
+                        {/* Subject, Snippet & Meeting Badges */}
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          <span
+                            className={`shrink-0 text-sm ${
+                              email.unread
+                                ? "font-bold text-neutral-900"
+                                : "font-normal text-neutral-600"
+                            }`}
+                          >
+                            {email.subject}
+                          </span>
+
+                          {/* Meeting Timing & Duration Badge */}
+                          {email.meetingInfo?.hasMeeting && (
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-2xs">
+                              <Calendar className="h-3 w-3 text-neutral-600" />
+                              <span>
+                                {email.meetingInfo.duration
+                                  ? email.meetingInfo.duration
+                                  : "Meeting"}
+                                {email.meetingInfo.timing
+                                  ? ` • ${email.meetingInfo.timing}`
+                                  : ""}
+                              </span>
+                            </span>
+                          )}
+
+                          <span className="text-neutral-400">—</span>
+                          <span
+                            className={`truncate text-xs ${
+                              email.unread ? "text-neutral-600" : "text-neutral-400"
+                            }`}
+                          >
+                            {email.body.replace(/\n+/g, " ")}
+                          </span>
+                        </div>
+
+                        {/* Right: Timestamp & Hover Delete Button */}
+                        <div className="relative flex items-center justify-end w-24 shrink-0">
+                          <span className="text-xs font-medium text-neutral-400 group-hover:opacity-0 transition-opacity tabular-nums">
+                            {email.timestamp}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              deleteEmail(email.id)
+                              showTrashToast([email], "Conversation moved to Trash.")
+                            }}
+                            title="Delete"
+                            className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 active:scale-95"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )

@@ -76,7 +76,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   // When on /mail, render the 4 mail sections: Inbox, Starred, Draft, Sent
   if (isMailView) {
     return (
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-5 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
         <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto no-scrollbar rounded-full border border-black/5 bg-[#ececeb]/95 sm:bg-[#ececeb] p-1.5 sm:p-2 shadow-lg sm:shadow-sm backdrop-blur-md">
           {mailTabs.map((tab, i) => {
             const isActive = activeFolder === tab.id
@@ -117,7 +117,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   // When on /todos, render the 4 task sections: Inbox, Today, Upcoming, Completed
   if (isTodoView) {
     return (
-      <div className="pointer-events-none fixed inset-x-0 bottom-4 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-5 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
         <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto no-scrollbar rounded-full border border-black/5 bg-[#ececeb]/95 sm:bg-[#ececeb] p-1.5 sm:p-2 shadow-lg sm:shadow-sm backdrop-blur-md">
           {taskViews.map((tab, i) => {
             const isActive = activeTaskView === tab
@@ -156,7 +156,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-4 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
+    <div className="pointer-events-none fixed inset-x-0 bottom-5 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">
       <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto no-scrollbar rounded-full border border-black/5 bg-[#ececeb]/95 sm:bg-[#ececeb] p-1.5 sm:p-2 shadow-lg sm:shadow-sm backdrop-blur-md">
         {views.map((view, i) => {
           const isActive = activeView === view
