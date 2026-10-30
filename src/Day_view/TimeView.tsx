@@ -258,7 +258,7 @@ const TimeView: React.FC<TimeViewProps> = () => {
         location: storeEvent.location,
         id: storeEvent.id,
       })
-    } catch (error) {
+    } catch (_error) {
       // Event creation failed
     }
 
@@ -915,9 +915,6 @@ const TimeView: React.FC<TimeViewProps> = () => {
           const startMinutes = start.hour * 60 + start.min
           const duration = originalEventRef.current?.duration || 0
           const endMinutes = (startMinutes + duration) % 1440
-          const endHour = Math.floor(endMinutes / 60)
-          const endMin = endMinutes % 60
-          const end = { hour: endHour, min: endMin }
           
           const dateStr = formatDate(selectedDate)
           

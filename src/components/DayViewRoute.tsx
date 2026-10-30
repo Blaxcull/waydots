@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo } from 'react'
+import { useLayoutEffect, useMemo } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { useTimeStore } from '@/store/timeStore'
 import { useEventsStore } from '@/store/eventsStore'

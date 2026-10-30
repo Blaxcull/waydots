@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import {
   Inbox,
   Send,
@@ -8,8 +8,6 @@ import {
   X,
   Calendar,
   CheckSquare,
-  Square,
-  MinusSquare,
   Minus,
   ChevronDown,
   MailOpen,
@@ -23,7 +21,8 @@ import {
   AlertTriangle,
   Wand2,
 } from "lucide-react"
-import { useEmailStore, type Email, type EmailPriority, type PriorityFilter } from "@/store/emailStore"
+import { useEmailStore, type Email, type EmailPriority } from "@/store/emailStore"
+import { useAuthStore } from "@/store/authStore"
 import { useEventsStore } from "@/store/eventsStore"
 import { Button } from "@/components/ui/button"
 import {
@@ -76,9 +75,9 @@ export default function MailView() {
     selectEmail,
     setSearchQuery,
     setSenderAccount,
+    setLoggedInUserEmail,
     setPriorityFilter,
     setSortByPriority,
-    toggleSortByPriority,
     setEmails,
     approveAiDraftAndSend,
     dismissAiDraft,
@@ -106,13 +105,17 @@ export default function MailView() {
   } | null>(null)
   const trashToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const user = useAuthStore((state) => state.user)
+  const session = useAuthStore((state) => state.session)
+  const loggedInEmail = user?.email || session?.user?.email || (typeof window !== "undefined" ? localStorage.getItem("user_email") : null)
+
   // AI & Priority state
   const [isAiSorting, setIsAiSorting] = useState(false)
   const [aiPromptInstruction, setAiPromptInstruction] = useState("")
   const [isRefiningDraft, setIsRefiningDraft] = useState(false)
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
-  const [isGmailConnected, setIsGmailConnected] = useState(false)
-  const [isGmailFetching, setIsGmailFetching] = useState(false)
+  const [isGmailSyncing, setIsGmailSyncing] = useState(false)
+  const [needsGmailAuth, setNeedsGmailAuth] = useState(false)
 
   // Selection state (like Gmail)
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([])
@@ -436,41 +439,91 @@ export default function MailView() {
     }
   }
 
+  // Set the logged-in mail id as the primary sender account
   useEffect(() => {
-    getGoogleProviderToken().then((token) => {
-      if (token) {
-        setIsGmailConnected(true)
-      }
-    })
-  }, [])
+    if (loggedInEmail) {
+      setLoggedInUserEmail(loggedInEmail)
+    }
+  }, [loggedInEmail, setLoggedInUserEmail])
 
-  const handleConnectOrSyncGmail = async () => {
-    setIsGmailFetching(true)
+  // Load cached synced Gmail emails for this user immediately on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
     try {
-      const token = await getGoogleProviderToken()
-      if (token) {
-        triggerToast("Fetching top 20 actual emails from Gmail...")
-        const liveEmails = await fetchTop20GmailMessages(token)
-        if (liveEmails.length > 0) {
-          setEmails(liveEmails)
-          setIsGmailConnected(true)
-          triggerToast(`Loaded top ${liveEmails.length} emails from your Gmail inbox!`)
-        } else {
-          triggerToast("Connected to Gmail, but no inbox emails found.")
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEmails(parsed)
         }
-      } else {
-        triggerToast("Redirecting to Google Sign-In...")
-        const res = await connectGmailAccount()
-        if (res.error) {
-          triggerToast(`Google sign-in error: ${res.error}`)
+      }
+    } catch {
+      // Ignore cache parse error
+    }
+  }, [loggedInEmail, setEmails])
+
+  // Automatically fetch & sync the latest Gmail emails for the logged-in mail id
+  const syncGmailAutomatically = useCallback(async (isSilent = true) => {
+    try {
+      setIsGmailSyncing(true)
+      const token = await getGoogleProviderToken()
+      if (!token) {
+        setNeedsGmailAuth(true)
+        return
+      }
+
+      const liveEmails = await fetchTop20GmailMessages(token, loggedInEmail || undefined)
+      if (liveEmails.length > 0) {
+        setEmails(liveEmails)
+        setNeedsGmailAuth(false)
+        if (typeof window !== "undefined") {
+          const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+          localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
+        }
+        if (!isSilent) {
+          triggerToast(`Synced ${liveEmails.length} emails from Gmail`)
         }
       }
     } catch (err: any) {
-      triggerToast(err?.message || "Failed to fetch Gmail emails.")
+      if (err?.message === "GMAIL_INSUFFICIENT_SCOPES" || err?.status === 403 || err?.status === 401) {
+        setNeedsGmailAuth(true)
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("google_provider_token")
+        }
+      }
+      console.warn("Auto Gmail sync error:", err)
     } finally {
-      setIsGmailFetching(false)
+      setIsGmailSyncing(false)
+    }
+  }, [loggedInEmail, setEmails])
+
+  const handleGrantGmailAccess = async () => {
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("google_provider_token")
+      }
+      const res = await connectGmailAccount()
+      if (res.error) {
+        triggerToast(res.error)
+      }
+    } catch (err: any) {
+      triggerToast(err?.message || "Failed to initialize Google authorization")
     }
   }
+
+  useEffect(() => {
+    void syncGmailAutomatically(true)
+  }, [syncGmailAutomatically])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const handleFocus = () => {
+      void syncGmailAutomatically(true)
+    }
+    window.addEventListener("focus", handleFocus)
+    return () => window.removeEventListener("focus", handleFocus)
+  }, [syncGmailAutomatically])
 
   const handleSendManualReply = (emailId: string) => {
     if (!replyText.trim()) return
@@ -773,23 +826,24 @@ export default function MailView() {
                   <span>Priority Wise</span>
                 </button>
 
-                {/* Connect / Sync Gmail Button */}
-                <button
-                  type="button"
-                  onClick={handleConnectOrSyncGmail}
-                  disabled={isGmailFetching}
-                  title="Connect your Google Account to fetch top 20 actual emails from your Gmail inbox"
-                  className="flex items-center gap-1.5 rounded-full border border-gray-300/80 bg-white px-3.5 py-1.5 text-xs font-semibold text-neutral-800 shadow-2xs hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <GoogleIcon className="h-3.5 w-3.5" />
-                  <span>
-                    {isGmailFetching
-                      ? "Fetching Gmail..."
-                      : isGmailConnected
-                      ? "Sync Gmail (Top 20)"
-                      : "Connect Gmail"}
-                  </span>
-                </button>
+                {isGmailSyncing && (
+                  <div className="flex items-center gap-1.5 rounded-full border border-gray-300/60 bg-white/70 px-3 py-1 text-xs text-neutral-600">
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                    <span className="text-[11px] font-medium">Syncing...</span>
+                  </div>
+                )}
+
+                {needsGmailAuth && !isGmailSyncing && (
+                  <button
+                    type="button"
+                    onClick={handleGrantGmailAccess}
+                    title="Grant Gmail permission to automatically sync emails for your account"
+                    className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer"
+                  >
+                    <GoogleIcon className="h-3.5 w-3.5" />
+                    <span>Authorize Gmail Sync</span>
+                  </button>
+                )}
               </div>
 
               {searchQuery && (
@@ -955,8 +1009,20 @@ export default function MailView() {
                 <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
                   <Inbox className="h-10 w-10 text-neutral-400" />
                   <p className="mt-3 text-sm font-medium text-neutral-500">
-                    No emails matching current criteria in {folderTitle}
+                    {needsGmailAuth
+                      ? "Gmail authorization required to sync your inbox"
+                      : `No emails matching current criteria in ${folderTitle}`}
                   </p>
+                  {needsGmailAuth && (
+                    <button
+                      type="button"
+                      onClick={handleGrantGmailAccess}
+                      className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                    >
+                      <GoogleIcon className="h-3.5 w-3.5" />
+                      <span>Authorize Gmail Sync</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 displayedEmails.map((email) => {

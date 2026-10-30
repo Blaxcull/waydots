@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { getAppOpenDates, isoDate, type RawEvent } from "@/lib/streak-mock";
 
-export function DayDotGrid({ events, days = 28 }: { events: RawEvent[]; days?: number }) {
+export function DayDotGrid({ events: _events, days = 28 }: { events: RawEvent[]; days?: number }) {
   const appOpenDays = useMemo(() => new Set(getAppOpenDates()), []);
 
   const grid = useMemo(() => {

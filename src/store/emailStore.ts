@@ -185,6 +185,7 @@ interface EmailStoreState {
   setEmails: (emails: Email[]) => void
   setSearchQuery: (query: string) => void
   setSenderAccount: (account: string) => void
+  setLoggedInUserEmail: (email: string) => void
   approveAiDraftAndSend: (id: string, finalReplyText?: string) => void
   dismissAiDraft: (id: string) => void
   setAiDraftForEmail: (id: string, draft: EmailDraft) => void
@@ -262,6 +263,19 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
 
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSenderAccount: (senderAccount) => set({ senderAccount }),
+  setLoggedInUserEmail: (email) =>
+    set((state) => {
+      const trimmed = email.trim()
+      if (!trimmed) return state
+      const primary = `${trimmed} (Primary)`
+      const others = state.availableSenders.filter(
+        (s) => !s.startsWith(trimmed) && !s.includes("(Primary)")
+      )
+      return {
+        senderAccount: trimmed,
+        availableSenders: [primary, ...others],
+      }
+    }),
 
   approveAiDraftAndSend: (id, finalReplyText) =>
     set((state) => ({

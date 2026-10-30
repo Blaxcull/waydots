@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useState, useMemo } from "react";
-import { ArrowLeft, Check, CreditCard, ShieldCheck, Sparkles, TicketPercent } from "lucide-react";
+import { ArrowLeft, Check, Sparkles } from "lucide-react";
 import { createProOrder, loadRazorpayCheckout, openRazorpayCheckout, verifyProPayment, type RazorpayOrderResponse } from "@/lib/razorpay";
 import { supabase } from "@/lib/supabase";
 
@@ -146,7 +146,7 @@ export function CheckoutPage() {
       try {
         await navigator.clipboard.writeText(checkoutOrder.shortUrl);
         window.alert("Link copied!");
-      } catch (err) {
+      } catch (_err) {
         window.alert("Failed to copy link.");
       }
     }

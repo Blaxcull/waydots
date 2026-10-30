@@ -66,7 +66,7 @@ export function SideBar({
     
     try {
       await saveSelectedEvent()
-    } catch (error) {
+    } catch (_error) {
       // Save failed
     }
   }, [selectedEventId, saveSelectedEvent])

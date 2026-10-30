@@ -501,7 +501,7 @@ export async function generateContextualDraft(
   let defaultSlot = email.meetingInfo?.timing
     ? `${email.meetingInfo.timing} (${email.meetingInfo.duration || "45 mins"})`
     : "Thursday, Oct 31 • 11:30 AM - 12:15 PM"
-  let defaultTask = `Prepare for ${email.meetingInfo?.topic || email.subject.slice(0, 30)}`
+  const defaultTask = `Prepare for ${email.meetingInfo?.topic || email.subject.slice(0, 30)}`
 
   if (apiKey) {
     const models = ["gemini-3.5-flash-lite", "gemini-2.5-flash"]

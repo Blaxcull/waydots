@@ -4,7 +4,7 @@ import { useTimeStore } from "@/store/timeStore"
 import { useEventsStore, formatDate } from "@/store/eventsStore"
 import { resolveGoalColorForEvent, useGoalsStore } from "@/store/goalsStore"
 import { isSeriesActuallyRecurring, isSeriesAnchorEvent } from "@/store/recurringUtils"
-import { TOP_DEAD_ZONE, SLOT_HEIGHT, addEventOnClick, calculateEventPositions, getClockwiseDurationMinutes, getEventVisualColors, isAllDayEvent, isMultiDayEvent, isTimedMultiDayEvent, isTopBarEventType, isOvernightTimedEvent, storeEventToUIEvent, uiEventToStoreEvent } from "@/lib/eventUtils"
+import { TOP_DEAD_ZONE, SLOT_HEIGHT, addEventOnClick, calculateEventPositions, getClockwiseDurationMinutes, getEventVisualColors, isTimedMultiDayEvent, isTopBarEventType, isOvernightTimedEvent, storeEventToUIEvent, uiEventToStoreEvent } from "@/lib/eventUtils"
 import { compareEventsByDisplayOrder } from "@/store/eventsStore.helpers"
 import {
   formatTime,
@@ -13,8 +13,6 @@ import {
   getDateFromSpanningClick,
   gridLines,
   hourSlots,
-  TIMELINE_SURFACE_ACTIVE_COLOR,
-  TIMELINE_SURFACE_COLOR,
   TOP_ROW_ITEM_OFFSET,
   TOP_ROW_LANE_PITCH,
 } from "./weekView.utils"
@@ -104,7 +102,7 @@ const WeekView = () => {
         const visibleStartKey = startKey < firstWeekKey ? firstWeekKey : startKey
         if (endKey < firstWeekKey || startKey > lastWeekKey) return
         if (isSpan && visibleStartKey !== dayKey) return
-        if (!weekDayIndexByKey.hasOwnProperty(visibleStartKey)) return
+        if (!(visibleStartKey in weekDayIndexByKey)) return
         if (seen.has(event.id)) return
         seen.add(event.id)
         baseByDay[visibleStartKey].push(event)
@@ -120,7 +118,7 @@ const WeekView = () => {
         const endKey = event.end_date || event.date
         const visibleStartKey = startKey < firstWeekKey ? firstWeekKey : startKey
         if (endKey < firstWeekKey || startKey > lastWeekKey) return
-        if (!weekDayIndexByKey.hasOwnProperty(visibleStartKey)) return
+        if (!(visibleStartKey in weekDayIndexByKey)) return
 
         // Replace any stale copy with latest raw-cache version.
         weekDateKeys.forEach((key) => {
@@ -139,7 +137,7 @@ const WeekView = () => {
         const selectedStartKey = selectedEvent.date
         const selectedEndKey = selectedEvent.end_date || selectedEvent.date
         const visibleSelectedStartKey = selectedStartKey < firstWeekKey ? firstWeekKey : selectedStartKey
-        if (!(selectedEndKey < firstWeekKey || selectedStartKey > lastWeekKey) && weekDayIndexByKey.hasOwnProperty(visibleSelectedStartKey)) {
+        if (!(selectedEndKey < firstWeekKey || selectedStartKey > lastWeekKey) && visibleSelectedStartKey in weekDayIndexByKey) {
           weekDateKeys.forEach((key) => {
             baseByDay[key] = (baseByDay[key] || []).filter((event) => event.id !== selectedEvent.id)
           })
@@ -270,7 +268,6 @@ const WeekView = () => {
     const selectedEvent = getEventById(selectedEventId)
     if (!selectedEvent) return
 
-    const endDate = selectedEvent.end_date || selectedEvent.date
     const isTopRowEvent = isTopBarEventType(selectedEvent as any)
     if (!isTopRowEvent) return
 
@@ -304,7 +301,6 @@ const WeekView = () => {
     const event = getEventById(scrollToEventId) as any
     if (!event) return
 
-    const endDate = event.end_date || event.date
     const isTopRowEvent = isTopBarEventType(event as any)
     if (isTopRowEvent) {
       if (!showAllTopEvents) {
@@ -953,9 +949,8 @@ const WeekView = () => {
                   ) : null}
                 </div>
                 <div className="flex-1 grid grid-cols-7 gap-2 pl-3 pr-3">
-                  {weekDays.map((day, dayIndex) => {
+                  {weekDays.map((day) => {
                     const dayKey = formatDate(day)
-                    const topEvents = topRowLayout.allByDay[dayKey] || []
                     const visibleTopEvents = topRowLayout.visibleByDay[dayKey] || []
 
                     return (
@@ -1203,7 +1198,6 @@ const WeekView = () => {
                           const isStartColumn = (sourceEvent?.date || dayKey) === dayKey
                           const extensionDays = isStartColumn && !isOvernightLinkedEvent ? daySpan(dayKey, eventEndDate) : 0
                           const isExtendedEvent = extensionDays > 0
-                          const isHorizontalResizing = horizontalResizeState?.id === event.id
                           const isRecurringEvent = !!(
                             (sourceEvent as any)?.isRecurringInstance ||
                             ((sourceEvent as any)?.repeat && (sourceEvent as any)?.repeat !== "None")

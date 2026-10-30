@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react'
-import { useEventsStore, formatDate, type NewEvent, type EventFieldValue, type CalendarEvent } from '@/store/eventsStore'
+import { useEventsStore, formatDate, type NewEvent, type EventFieldValue } from '@/store/eventsStore'
 import { Calendar } from '@/components/ui/calendar'
 import calendarIcon from '@/assets/calendar2.png'
 import clockIcon from '@/assets/clock.png'
@@ -269,7 +269,7 @@ const handleSelect = (minutes: number) => {
         onKeyDown={handleInputKeyDown}
         onFocus={() => {
           isInputFocused.current = true
-          !disabled && setIsOpen(true)
+          if (!disabled) setIsOpen(true)
         }}
         disabled={disabled}
         className={`bg-neutral-100 rounded-lg px-2 py-1 border-b-2 border-neutral-300 text-xl focus:outline-none focus:border-red-500 w-20 text-center ${

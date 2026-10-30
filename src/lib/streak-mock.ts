@@ -112,7 +112,7 @@ export function computeStreak(events: RawEvent[]) {
   }
 
   let current = 0
-  let cursor = new Date()
+  const cursor = new Date()
   cursor.setHours(0, 0, 0, 0)
 
   while (streakDays.has(isoDate(cursor))) {

@@ -59,7 +59,7 @@ export function MailTodoPill({
   const navigate = useNavigate()
   const location = useLocation()
   const selectedDate = useTimeStore((state) => state.selectedDate)
-  const [internalActive, setInternalActive] = useState<"mail" | "todo" | null>(null)
+  const [internalActive] = useState<"mail" | "todo" | null>(null)
   const [imageError, setImageError] = useState(false)
 
   const isMailRoute = location.pathname === "/mail"

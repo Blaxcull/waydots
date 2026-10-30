@@ -153,7 +153,7 @@ export function WeekGraph({ events, weeks = 4, navigationDisabled = false }: { e
 }
 
 function DotStack({
-  done,
+  done: _done,
   total,
   delay,
   events,

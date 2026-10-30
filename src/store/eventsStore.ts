@@ -1002,14 +1002,13 @@ export const useEventsStore = create<EventsState>()(
       // ---- Update ----
 
       updateEvent: async (id: string, updates: Partial<NewEvent>) => {
-        const { eventsCache, pendingSyncs, pendingUpdates } = get()
+        const { eventsCache, pendingSyncs } = get()
         const found = findEventInCache(eventsCache, id)
 
         if (!found) return null
 
         const { event: currentEvent, dateKey: oldDate } = found
         const normalizedUpdates = normalizeGoalMetadataForDateChange(currentEvent, updates)
-        const newCache = { ...eventsCache }
 
         const updatedEvent = {
           ...currentEvent,
@@ -1117,9 +1116,8 @@ export const useEventsStore = create<EventsState>()(
       // ---- Delete ----
 
       deleteEvent: async (id: string) => {
-        const { eventsCache, computedEventsCache, pendingDeletes, pendingSyncs, pendingUpdates } = get()
+        const { eventsCache } = get()
         const newCache = { ...eventsCache }
-        const newComputedCache = { ...computedEventsCache }
 
         const event = Object.values(eventsCache).flat().find(e => e.id === id)
         const isTempEvent = event?.isTemp === true
@@ -1399,7 +1397,7 @@ export const useEventsStore = create<EventsState>()(
       updateEventField: (id: string, field: keyof NewEvent, value: EventFieldValue) => {
         if (value === undefined) return
 
-        const { eventsCache, pendingSyncs, pendingUpdates } = get()
+        const { eventsCache, pendingSyncs } = get()
 
         // Virtual recurring instances default to "only-this" semantics.
         if (isVirtualEventId(id)) {

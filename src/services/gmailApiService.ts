@@ -11,11 +11,12 @@ export async function connectGmailAccount(): Promise<{ error?: string }> {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        scopes: "https://www.googleapis.com/auth/gmail.readonly email profile",
+        scopes: "openid email profile https://www.googleapis.com/auth/gmail.readonly",
         redirectTo: `${origin}/mail`,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
+          scope: "openid email profile https://www.googleapis.com/auth/gmail.readonly",
         },
       },
     })
@@ -34,8 +35,21 @@ export async function connectGmailAccount(): Promise<{ error?: string }> {
 export async function getGoogleProviderToken(): Promise<string | null> {
   try {
     const { data } = await supabase.auth.getSession()
-    return data.session?.provider_token || null
+    const token = data.session?.provider_token
+    if (token) {
+      if (typeof window !== "undefined") {
+        localStorage.setItem("google_provider_token", token)
+      }
+      return token
+    }
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("google_provider_token")
+    }
+    return null
   } catch {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("google_provider_token")
+    }
     return null
   }
 }
@@ -43,7 +57,10 @@ export async function getGoogleProviderToken(): Promise<string | null> {
 /**
  * Fetches the top 20 actual emails from the user's Gmail inbox.
  */
-export async function fetchTop20GmailMessages(accessToken: string): Promise<Email[]> {
+export async function fetchTop20GmailMessages(
+  accessToken: string,
+  recipientEmail?: string
+): Promise<Email[]> {
   const listUrl = "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=in:inbox"
   const listRes = await fetch(listUrl, {
     headers: {
@@ -54,6 +71,17 @@ export async function fetchTop20GmailMessages(accessToken: string): Promise<Emai
 
   if (!listRes.ok) {
     const errText = await listRes.text()
+    if (listRes.status === 401 || listRes.status === 403) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("google_provider_token")
+      }
+    }
+    const isScopeError = errText.toLowerCase().includes("scope") || listRes.status === 403
+    if (isScopeError) {
+      const scopeErr = new Error("GMAIL_INSUFFICIENT_SCOPES")
+      ;(scopeErr as any).status = 403
+      throw scopeErr
+    }
     throw new Error(`Gmail API returned ${listRes.status}: ${errText.slice(0, 150)}`)
   }
 
@@ -135,7 +163,7 @@ export async function fetchTop20GmailMessages(accessToken: string): Promise<Emai
         subject,
         senderName,
         senderEmail,
-        recipientEmail: "you@waydots.com",
+        recipientEmail: recipientEmail || "you@waydots.com",
         body,
         timestamp,
         unread,

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Ban, ChevronRight, ChevronsUpDown, CircleDot, Palette, Shapes, Target } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select";
 import type { Goal } from "./goal";
 import { DEFAULT_GOAL_ICON, GOAL_COLORS, GOAL_ICONS, normalizeGoalIcon } from "./goal";
@@ -44,10 +43,8 @@ const GoalSidebar = ({
   prefillStatus,
   columnType,
   onSave,
-  onClearPrefill,
+  onClearPrefill: _onClearPrefill,
 }: GoalSidebarProps) => {
-  const navigate = useNavigate();
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
   const getAvailableTargetPeriods = () => {
     if (!columnType) {
@@ -95,7 +92,6 @@ const GoalSidebar = ({
       setStatus(prefillStatus || "active");
       setDescription(prefillNotes || "");
       setIcon(normalizeGoalIcon(prefillIcon));
-      setEditingGoal(null);
     }
   }, [prefillName, prefillNotes, prefillColor, prefillIcon, prefillTargetValue, prefillTargetPeriod, prefillStatus]);
 
@@ -107,7 +103,6 @@ const GoalSidebar = ({
     setStatus("active");
     setDescription("");
     setIcon(DEFAULT_GOAL_ICON);
-    setEditingGoal(null);
   };
 
   const handleSave = () => {

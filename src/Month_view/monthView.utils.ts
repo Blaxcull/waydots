@@ -13,7 +13,7 @@ export const MULTI_DAY_ROW_TOP_OFFSET = 5
 export const MULTI_DAY_ROW_BOTTOM_GAP = 2
 export const MONTH_EVENT_ROW_HEIGHT = MONTH_EVENT_CHIP_HEIGHT
 export const MONTH_EVENT_ROW_GAP = 1
-export const NORMAL_EVENT_TOP_OFFSET = 6
+export const NORMAL_EVENT_TOP_OFFSET = 4
 
 export const formatClock = (totalMinutes: number) => {
   const hour = Math.floor(totalMinutes / 60) % 24

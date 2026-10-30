@@ -33,6 +33,13 @@ export const useAuthStore = create<AuthState>((set) => {
         const { data: { session }, error } = await getSafeSession()
         if (error) throw error
 
+        if (session?.provider_token && typeof window !== 'undefined') {
+          localStorage.setItem('google_provider_token', session.provider_token)
+        }
+        if (session?.user?.email && typeof window !== 'undefined') {
+          localStorage.setItem('user_email', session.user.email)
+        }
+
         set({
           session,
           user: session?.user ?? null,
@@ -48,6 +55,17 @@ export const useAuthStore = create<AuthState>((set) => {
 
       // Set up the single global listener
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (session?.provider_token && typeof window !== 'undefined') {
+          localStorage.setItem('google_provider_token', session.provider_token)
+        }
+        if (session?.user?.email && typeof window !== 'undefined') {
+          localStorage.setItem('user_email', session.user.email)
+        }
+        if (event === 'SIGNED_OUT' && typeof window !== 'undefined') {
+          localStorage.removeItem('google_provider_token')
+          localStorage.removeItem('user_email')
+        }
+
         set({
           session,
           user: session?.user ?? null,
@@ -60,6 +78,10 @@ export const useAuthStore = create<AuthState>((set) => {
     },
 
     signOut: async () => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('google_provider_token')
+        localStorage.removeItem('user_email')
+      }
       await supabase.auth.signOut()
       set({
         session: null,

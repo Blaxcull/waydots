@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { DragEvent, MouseEvent } from "react"
+import type { DragEvent } from "react"
 import {
   addDays,
   differenceInCalendarDays,
@@ -20,14 +20,12 @@ import { getEventVisualColors, isAllDayEvent, isMultiDayEvent, isTimedMultiDayEv
 import {
   compareMonthEventsWithPinnedPriority,
   DATE_ROW_HEIGHT,
-  formatClock,
   getDateAtStartOfDay,
   getDateFromSpanningClick,
   getEventLabel,
   getMonthCellTone,
   getTimedEventPieces,
   MAX_VISIBLE_EVENTS,
-  MONTH_EVENT_CHIP_HEIGHT,
   MONTH_EVENT_ROW_GAP,
   MONTH_EVENT_ROW_HEIGHT,
   MULTI_DAY_ITEM_HEIGHT,
@@ -524,6 +522,7 @@ const MonthView = () => {
         const dateKey = element.dataset.dateKey
         if (!dateKey) return
         const height = element.clientHeight
+        if (height <= 0) return
         const perRow = MONTH_EVENT_ROW_HEIGHT + MONTH_EVENT_ROW_GAP
         const capacity = Math.max(0, Math.floor((height + MONTH_EVENT_ROW_GAP) / perRow))
         nextCapacities[dateKey] = capacity
@@ -551,7 +550,7 @@ const MonthView = () => {
       <div className="h-[100%] w-[100%] rounded-l-2xl bg-[radial-gradient(circle_at_18%_0%,#ffffff_0%,#ececeb_34%,#dfdfdc_100%)] shadow-xl flex flex-col overflow-hidden text-neutral-900 antialiased" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Inter, system-ui, sans-serif' }}>
       {/* Title bar */}
       <div className="px-9 pt-32 pb-5 shrink-0">
-        <h1 className="text-6xl pb-0 font-semibold text-neutral-800 tracking-tight">
+        <h1 aria-label={`${format(displayDate, "MMMM")} ${format(displayDate, "yyyy")}`} className="text-6xl pb-0 font-semibold text-neutral-800 tracking-tight">
           <span className="text-black">
             {format(displayDate, "MMMM")},
           </span>
@@ -612,7 +611,6 @@ const MonthView = () => {
                       (pinnedDraftEvent &&
                         !isMultiDayEvent(pinnedDraftEvent) &&
                         pinnedDraftEvent.date === dateKey &&
-                        hasMultiDayOverlapOnDay &&
                         pinnedDraftEvent)) ??
                     null
                   const dayEvents = (monthEventsByDateKey[dateKey] || []).filter((event) => {
@@ -646,6 +644,7 @@ const MonthView = () => {
                     <div
                       key={dateKey}
                       role="button"
+                      aria-label={format(cellDate, "MMMM d, yyyy")}
                       tabIndex={0}
                       onClick={() => {
                         if (suppressNextCellClickRef.current) {
@@ -727,7 +726,7 @@ const MonthView = () => {
                             createEventForDate(cellDate)
                           }}
                           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[15px] leading-none text-neutral-400 opacity-0 transition-all hover:bg-neutral-900 hover:text-white group-hover:opacity-100 focus:opacity-100"
-                          aria-label="Add event"
+                          aria-label={`Add event on ${format(cellDate, "MMMM d")}`}
                         >
                           +
                         </button>
@@ -736,6 +735,8 @@ const MonthView = () => {
                       {/* Pinned selected single-day event. It overlays the multi-day lane without reserving extra vertical space. */}
                       {selectedSingleDayEventPinnedInTopRow ? (
                         <div
+                          role="button"
+                          aria-label={`Open spanning event ${selectedSingleDayEventPinnedInTopRow.title} starting ${selectedSingleDayEventPinnedInTopRow.date}`}
                           draggable
                           onDragStart={(dragEvent) =>
                             handleEventDragStart(dragEvent, selectedSingleDayEventPinnedInTopRow, formatDate(cellDate))
@@ -812,6 +813,12 @@ const MonthView = () => {
                           return (
                             <div
                               key={event.id}
+                              role="button"
+                              aria-label={
+                                timedPieces
+                                  ? `Open event ${timedPieces.time} ${timedPieces.title} on ${format(cellDate, "MMMM d, yyyy")}`
+                                  : `Open event ${getEventLabel(event)} on ${format(cellDate, "MMMM d, yyyy")}`
+                              }
                               draggable
                               onDragStart={(dragEvent) => handleEventDragStart(dragEvent, event, formatDate(cellDate))}
                               onDragEnd={() => resetDragState()}
@@ -904,6 +911,8 @@ const MonthView = () => {
                     return (
                       <div
                         key={`${item.event.id}-${item.startIdx}`}
+                        role="button"
+                        aria-label={`Open spanning event ${item.event.title} starting ${item.event.date}`}
                         draggable
                         onDragStart={(dragEvent) => handleEventDragStart(dragEvent, item.event, item.event.date)}
                         onDragEnd={() => resetDragState()}

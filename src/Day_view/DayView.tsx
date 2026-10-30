@@ -1,7 +1,7 @@
 import { useTimeStore } from "@/store/timeStore"
 import { useEventsStore, formatDate } from "@/store/eventsStore"
 import { resolveGoalColorForEvent, resolveGoalIconForEvent, useGoalsStore } from "@/store/goalsStore"
-import { getEventVisualColors, isAllDayEvent, isMultiDayEvent, isTimedMultiDayEvent, isTopBarEventType } from "@/lib/eventUtils"
+import { getEventVisualColors, isMultiDayEvent, isTimedMultiDayEvent, isTopBarEventType } from "@/lib/eventUtils"
 import { getGoalIcon } from "@/Goal_view/goal"
 import TimeLine from "./TimeLine"
 import TimeView from "./TimeView"
