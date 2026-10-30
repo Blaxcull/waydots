@@ -41,6 +41,7 @@ function SignupContent() {
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const navigate = useNavigate()
@@ -75,6 +76,7 @@ function SignupContent() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setSuccessMessage('')
 
     if (password !== confirmPassword) {
       setError('Passwords do not match')
@@ -92,9 +94,11 @@ function SignupContent() {
 
     if (error) {
       setError(error.message)
-    } else if (data.user) {
+    } else if (data.session) {
       const today = new Date()
       navigate(`/day/${today.getFullYear()}/${today.getMonth() + 1}/${today.getDate()}`)
+    } else if (data.user) {
+      setSuccessMessage('Account created! Please check your email inbox to confirm your account.')
     }
 
     setLoading(false)
@@ -212,6 +216,15 @@ function SignupContent() {
                   className="text-xs text-destructive font-medium bg-destructive/10 p-2.5 rounded-lg"
                 >
                   {error}
+                </motion.p>
+              )}
+              {successMessage && (
+                <motion.p 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="text-xs text-emerald-600 dark:text-emerald-400 font-medium bg-emerald-500/10 p-2.5 rounded-lg border border-emerald-500/20"
+                >
+                  {successMessage}
                 </motion.p>
               )}
               <Button 
