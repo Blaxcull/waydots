@@ -49,13 +49,12 @@ function SignupContent() {
     setError('')
     setGoogleLoading(true)
     try {
-      const redirectOrigin =
-        typeof window !== 'undefined' ? window.location.origin : 'https://waydots.app'
+      const redirectOrigin = window.location.origin
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          scopes: 'https://www.googleapis.com/auth/gmail.readonly email profile',
-          redirectTo: `${redirectOrigin}/mail`,
+          scopes: 'email profile',
+          redirectTo: `${redirectOrigin}/today`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -86,6 +85,9 @@ function SignupContent() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/today`,
+      },
     })
 
     if (error) {

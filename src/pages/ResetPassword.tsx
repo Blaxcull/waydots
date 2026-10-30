@@ -26,13 +26,7 @@ function hasRecoveryParams() {
 }
 
 function getResetRedirectUrl() {
-  const { origin, hostname } = window.location
-
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `${origin}/reset-password`
-  }
-
-  return 'https://waydots.app/reset-password'
+  return `${window.location.origin}/reset-password`
 }
 
 export function ResetPassword() {

@@ -7,7 +7,7 @@ import { classifyEmailsWithKeywords } from "@/services/geminiMailService"
  */
 export async function connectGmailAccount(): Promise<{ error?: string }> {
   try {
-    const origin = typeof window !== "undefined" ? window.location.origin : "https://waydots.app"
+    const origin = window.location.origin
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
