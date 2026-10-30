@@ -2,6 +2,7 @@ import { ChevronLeft } from 'lucide-react'
 import SearchIcon from '@/assets/search.svg'
 import { SideBar } from '@/SideBar/SideBar'
 import { Button } from '@/components/ui/button'
+import { MailTodoPill } from '@/components/MailTodoPill'
 
 export function SearchControlButton({
   onOpenSearch,
@@ -11,19 +12,28 @@ export function SearchControlButton({
   inline?: boolean
 }) {
   return (
-    <Button
-      type="button"
-      variant="ghost"
-      onClick={onOpenSearch}
+    <div
       className={
         inline
-          ? "h-16 w-16 rounded-full border border-black/5 bg-[#e7e7e4] text-slate-600 shadow-sm transition-all duration-200 ease-out hover:scale-105 hover:text-slate-800 hover:shadow-md"
-          : "pointer-events-auto fixed right-4 top-4 z-[20050] h-16 w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl"
+          ? "flex items-center gap-3"
+          : "pointer-events-auto fixed right-4 top-4 z-[20050] flex items-center gap-3"
       }
-      aria-label="Search events"
     >
-      <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
-    </Button>
+      <MailTodoPill />
+      <Button
+        type="button"
+        variant="ghost"
+        onClick={onOpenSearch}
+        className={
+          inline
+            ? "h-16 w-16 rounded-full border border-black/5 bg-[#e7e7e4] text-slate-600 shadow-sm transition-all duration-200 ease-out hover:scale-105 hover:text-slate-800 hover:shadow-md"
+            : "h-16 w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl"
+        }
+        aria-label="Search events"
+      >
+        <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
+      </Button>
+    </div>
   )
 }
 

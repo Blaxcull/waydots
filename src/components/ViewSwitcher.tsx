@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useNavigate, useLocation } from "react-router-dom"
 import { useTimeStore } from "@/store/timeStore"
+import { useEmailStore, type MailFolder } from "@/store/emailStore"
 
 export type ViewType = "day" | "week" | "month" | "year"
 
@@ -11,6 +12,13 @@ interface ViewSwitcherProps {
 }
 
 const views: ViewType[] = ["day", "week", "month", "year"]
+
+const mailTabs: { id: MailFolder; label: string }[] = [
+  { id: "inbox", label: "Inbox" },
+  { id: "starred", label: "Starred" },
+  { id: "draft", label: "Draft" },
+  { id: "sent", label: "Sent" },
+]
 
 const getActiveViewFromPathname = (pathname: string): ViewType | null => {
   if (pathname.startsWith("/day/")) return "day"
@@ -25,7 +33,14 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
   const location = useLocation()
   const selectedDate = useTimeStore((state) => state.selectedDate)
   const routeActiveView = getActiveViewFromPathname(location.pathname)
-  const shouldClearSelection = location.pathname === "/analysis" || location.pathname === "/goals"
+  const isMailView = location.pathname === "/mail"
+  const activeFolder = useEmailStore((state) => state.activeFolder)
+  const setActiveFolder = useEmailStore((state) => state.setActiveFolder)
+
+  const shouldClearSelection =
+    location.pathname === "/analysis" ||
+    location.pathname === "/goals" ||
+    location.pathname === "/mail"
   const activeView = routeActiveView ?? (shouldClearSelection ? null : currentView)
 
   const handleViewClick = (view: ViewType) => {
@@ -50,6 +65,47 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
     if (view === "year") {
       navigate(`/year/${year}/${month}/${day}`)
     }
+  }
+
+  // When on /mail, render the 4 mail sections: Inbox, Starred, Draft, Sent
+  if (isMailView) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+        <div className="pointer-events-auto flex max-w-full items-center overflow-x-auto rounded-full border border-black/5 bg-[#ececeb] p-2 shadow-sm">
+          {mailTabs.map((tab, i) => {
+            const isActive = activeFolder === tab.id
+            const nextTab = mailTabs[i + 1]
+            const nextActive = nextTab ? activeFolder === nextTab.id : false
+
+            return (
+              <div key={tab.id} className="flex items-center">
+                <Button
+                  onClick={() => setActiveFolder(tab.id)}
+                  className={cn(
+                    "w-[120px] rounded-full py-6 text-xl font-semibold capitalize",
+                    "transition-all duration-200 ease-out",
+                    "bg-transparent text-neutral-600",
+                    "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
+                    isActive && "bg-[#dddddd] shadow-sm text-neutral-800"
+                  )}
+                >
+                  {tab.label}
+                </Button>
+
+                {i < mailTabs.length - 1 && (
+                  <div
+                    className={cn(
+                      "w-px h-8 bg-gray-300 mx-1 transition-opacity duration-200",
+                      isActive || nextActive ? "opacity-0" : "opacity-100"
+                    )}
+                  />
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   return (

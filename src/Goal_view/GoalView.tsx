@@ -10,6 +10,7 @@ import { useEventsStore } from "@/store/eventsStore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import SearchIcon from "@/assets/search.svg";
+import { MailTodoPill } from "@/components/MailTodoPill";
 import type { ColumnType, DragState, SearchGoalResult, TodoItem, TodoStore } from "./goalView.types";
 import { getBucketLabel, getColumnTypeFromBucketKey, getKey, parseBucketDate, slideVariants } from "./goalView.utils";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -774,15 +775,18 @@ const GoalView = () => {
 
   return (
     <div className="relative flex h-screen w-full overflow-hidden bg-gradient-to-br from-neutral-100 via-neutral-50 to-neutral-200 p-4 pt-[120px] gap-4">
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => setSearchOpen(true)}
-        className="fixed top-[17px] right-[17px] z-50 h-16 w-16 rounded-full border-[1px] shadow-lg text-slate-600 transition-all duration-200 ease-out hover:scale-110 hover:shadow-xl hover:text-slate-800"
-        aria-label="Open goal search"
-      >
-        <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
-      </Button>
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-3">
+        <MailTodoPill />
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => setSearchOpen(true)}
+          className="h-16 w-16 rounded-full border-[1px] shadow-lg text-slate-600 transition-all duration-200 ease-out hover:scale-110 hover:shadow-xl hover:text-slate-800 bg-[#ececeb]/95 backdrop-blur-sm"
+          aria-label="Open goal search"
+        >
+          <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
+        </Button>
+      </div>
       <div className="flex min-h-0 w-full flex-col gap-4">
         <div className="grid min-h-0 flex-1 w-full grid-flow-col auto-cols-[minmax(280px,calc(100vw-2rem))] gap-4 overflow-x-auto overflow-y-hidden no-scrollbar md:auto-cols-[minmax(320px,calc((100vw-3rem)/2))] xl:grid-flow-row xl:grid-cols-4 xl:auto-cols-auto xl:overflow-hidden">
       <div data-column-type="week" className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-black/5 bg-white/60 shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-xl">

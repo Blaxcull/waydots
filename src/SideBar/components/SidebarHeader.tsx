@@ -3,6 +3,7 @@ import SearchIcon from '@/assets/search.svg'
 import { Button } from '@/components/ui/button'
 import { CardContent } from '@/components/ui/card'
 import { Calendar } from '@/components/ui/sidebarCalendar'
+import { MailTodoPill } from '@/components/MailTodoPill'
 
 interface SidebarHeaderProps {
   compact: boolean
@@ -36,19 +37,18 @@ export default function SidebarHeader({
 
   return (
     <>
-      <Button
-        variant="ghost"
-        onClick={onOpenSearch}
-        className="absolute top-4 right-4 z-10
-shadow-lg text-slate-600
-border-[1px]
-hover:text-slate-800 
-rounded-full h-16 w-16
-transition-all duration-200 ease-out
-hover:scale-110 hover:shadow-xl"
-      >
-        <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
-      </Button>
+      <div className="absolute top-4 right-4 z-10 flex items-center gap-3">
+        <MailTodoPill />
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={onOpenSearch}
+          className="shadow-lg text-slate-600 border-[1px] hover:text-slate-800 rounded-full h-16 w-16 transition-all duration-200 ease-out hover:scale-110 hover:shadow-xl bg-[#ececeb]/95 backdrop-blur-sm"
+          aria-label="Search events"
+        >
+          <img src={SearchIcon} alt="Search" className="h-8 w-8 opacity-60" />
+        </Button>
+      </div>
 
       <CardContent className={`shrink-0 ${containerPadding}`}>
         <div className={layoutClass}>

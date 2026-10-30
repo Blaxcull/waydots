@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { SearchEventsDialog } from '@/SideBar/SearchEventsDialog'
+import { SearchMailDialog } from '@/Mail_view/SearchMailDialog'
 import { AppRoutes } from '@/app/AppRoutes'
 import { CompactSidebarOverlay, DesktopSidebar, FloatingSidebarControls } from '@/app/AppSidebar'
 import { useAppShell } from '@/app/useAppShell'
@@ -20,10 +21,11 @@ function App() {
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup' || location.pathname === '/reset-password'
   const isGoalView = location.pathname === '/goals'
   const isAnalysisView = location.pathname === '/analysis'
+  const isMailView = location.pathname === '/mail'
   const isHomePage = location.pathname === '/'
   const isCheckoutPage = location.pathname === '/checkout'
   const isShellHiddenPage = isAuthPage || isHomePage || isCheckoutPage
-  const isSidebarlessPage = isGoalView || isAnalysisView
+  const isSidebarlessPage = isGoalView || isAnalysisView || isMailView
   const {
     currentView,
     setCurrentView,
@@ -74,7 +76,7 @@ function App() {
         />
       )}
 
-      {(showFloatingSidebarButton || isAnalysisView) && (
+      {(showFloatingSidebarButton || isAnalysisView || isMailView) && (
         <FloatingSidebarControls
           isHoverVisible={isSidebarHoverVisible}
           onHoverVisibleChange={setIsSidebarHoverVisible}
@@ -84,7 +86,11 @@ function App() {
         />
       )}
 
-      <SearchEventsDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      {isMailView ? (
+        <SearchMailDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      ) : (
+        <SearchEventsDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      )}
     </>
   )
 }
