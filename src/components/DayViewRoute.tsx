@@ -192,5 +192,8 @@ export function TodayRedirect() {
   const month = today.getMonth() + 1 // 1-indexed for URL
   const day = today.getDate()
 
-  return <Navigate to={`/day/${year}/${month}/${day}`} replace />
+  const search = typeof window !== 'undefined' ? window.location.search : ''
+  const hash = typeof window !== 'undefined' ? window.location.hash : ''
+
+  return <Navigate to={`/day/${year}/${month}/${day}${search}${hash}`} replace />
 }

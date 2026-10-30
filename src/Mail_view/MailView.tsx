@@ -20,12 +20,14 @@ import {
   Clock,
   AlertTriangle,
   Wand2,
+  ExternalLink,
 } from "lucide-react"
 import { useEmailStore, type Email, type EmailPriority } from "@/store/emailStore"
 import { useAuthStore } from "@/store/authStore"
 import { useEventsStore } from "@/store/eventsStore"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 import {
   classifyAndSortEmailsWithGemini,
   classifyEmailsWithKeywords,
@@ -116,8 +118,10 @@ export default function MailView() {
   const [isRefiningDraft, setIsRefiningDraft] = useState(false)
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
   const [isGmailSyncing, setIsGmailSyncing] = useState(false)
-  const [needsGmailAuth, setNeedsGmailAuth] = useState(false)
   const [isGmailAuthorizing, setIsGmailAuthorizing] = useState(false)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalReason, setAuthModalReason] = useState("")
+  const [authModalActionUrl, setAuthModalActionUrl] = useState<string | null>(null)
 
   // Selection state (like Gmail)
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([])
@@ -470,6 +474,7 @@ export default function MailView() {
       setIsGmailAuthorizing(true)
       if (typeof window !== "undefined") {
         localStorage.removeItem("google_provider_token")
+        localStorage.removeItem("google_provider_token_rejected")
       }
       const res = await connectGmailAccount()
       if (res.error) {
@@ -485,20 +490,20 @@ export default function MailView() {
   // Automatically fetch & sync the latest Gmail emails for the logged-in mail id
   const syncGmailAutomatically = useCallback(async (isSilent = true) => {
     try {
-      setIsGmailSyncing(true)
       const token = await getGoogleProviderToken()
       if (!token) {
-        setNeedsGmailAuth(true)
         if (!isSilent) {
-          triggerToast("Connecting to Google to grant Gmail read access...")
-          await handleGrantGmailAccess()
+          setAuthModalReason("Your Google account is signed in, but reading Gmail messages has not been authorized yet. Click below to grant Gmail access.")
+          setAuthModalOpen(true)
         }
         return
       }
 
+      setIsGmailSyncing(true)
       const liveEmails = await fetchTop20GmailMessages(token, loggedInEmail || undefined)
-      setEmails(liveEmails)
-      setNeedsGmailAuth(false)
+      if (liveEmails.length > 0) {
+        setEmails(liveEmails)
+      }
       if (typeof window !== "undefined") {
         const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
         localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
@@ -507,17 +512,39 @@ export default function MailView() {
         }
       }
       if (!isSilent) {
-        triggerToast(`Successfully fetched ${liveEmails.length} emails from Gmail!`)
+        triggerToast(`Synced ${liveEmails.length} emails from Gmail`)
       }
     } catch (err: any) {
-      if (err?.message === "GMAIL_INSUFFICIENT_SCOPES" || err?.status === 403 || err?.status === 401) {
-        setNeedsGmailAuth(true)
+      if (
+        err?.code === "GMAIL_API_DISABLED" ||
+        err?.message?.includes("not enabled in your Google Cloud") ||
+        err?.message?.includes("is disabled")
+      ) {
+        const url =
+          err?.enableUrl ||
+          "https://console.developers.google.com/apis/api/gmail.googleapis.com/overview?project=575734561788"
+        setAuthModalActionUrl(url)
+        setAuthModalReason(
+          "The Gmail API is not yet enabled in your Google Cloud Project (575734561788). To allow Waydots to fetch your Gmail messages, please enable the Gmail API in Google Cloud Console, then click Retry."
+        )
+        if (!isSilent) {
+          setAuthModalOpen(true)
+        }
+      } else if (
+        err?.message?.includes("GMAIL_INSUFFICIENT_SCOPES") ||
+        err?.code === "GMAIL_INSUFFICIENT_SCOPES" ||
+        err?.status === 403
+      ) {
         if (typeof window !== "undefined") {
           localStorage.removeItem("google_provider_token")
+          localStorage.setItem("google_provider_token_rejected", "true")
         }
+        setAuthModalActionUrl(null)
+        setAuthModalReason(
+          "Google requires your consent to read your Gmail inbox messages. Click below to grant Gmail read access."
+        )
         if (!isSilent) {
-          triggerToast("Gmail read permission required. Opening Google authorization...")
-          await handleGrantGmailAccess()
+          setAuthModalOpen(true)
         }
       } else {
         if (!isSilent) {
@@ -538,9 +565,10 @@ export default function MailView() {
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.provider_token) {
         if (typeof window !== "undefined") {
+          localStorage.removeItem("google_provider_token_rejected")
           localStorage.setItem("google_provider_token", session.provider_token)
         }
-        void syncGmailAutomatically(false)
+        void syncGmailAutomatically(true)
       }
     })
     return () => {
@@ -858,12 +886,12 @@ export default function MailView() {
                   <span>Priority Wise</span>
                 </button>
 
-                {/* Fetch from Gmail button */}
+                {/* Sync Gmail Button */}
                 <button
                   type="button"
                   onClick={() => syncGmailAutomatically(false)}
                   disabled={isGmailSyncing || isGmailAuthorizing}
-                  title="Fetch latest emails from your Gmail inbox"
+                  title="Sync latest emails from Gmail"
                   className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer ${
                     isGmailSyncing
                       ? "border-blue-400 bg-blue-50 text-blue-700 shadow-xs"
@@ -873,34 +901,20 @@ export default function MailView() {
                   {isGmailSyncing ? (
                     <>
                       <span className="h-3 w-3 border-2 border-blue-600/40 border-t-blue-600 rounded-full animate-spin" />
-                      <span>Fetching Emails...</span>
+                      <span>Syncing...</span>
+                    </>
+                  ) : isGmailAuthorizing ? (
+                    <>
+                      <span className="h-3 w-3 border-2 border-neutral-600/40 border-t-neutral-600 rounded-full animate-spin" />
+                      <span>Connecting...</span>
                     </>
                   ) : (
                     <>
                       <GoogleIcon className="h-3.5 w-3.5" />
-                      <span>Fetch from Gmail</span>
+                      <span>Sync Gmail</span>
                     </>
                   )}
                 </button>
-
-                {needsGmailAuth && !isGmailSyncing && (
-                  isGmailAuthorizing ? (
-                    <div className="flex items-center gap-1.5 rounded-full bg-blue-600 text-white px-3 py-1.5 text-xs font-semibold shadow-xs shrink-0">
-                      <span className="h-3 w-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>Connecting Google...</span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleGrantGmailAccess}
-                      title="Grant Gmail permission to automatically sync emails for your account"
-                      className="flex items-center gap-1.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer shrink-0"
-                    >
-                      <GoogleIcon className="h-3.5 w-3.5" />
-                      <span>Authorize Gmail Sync</span>
-                    </button>
-                  )
-                )}
               </div>
 
               {searchQuery && (
@@ -1066,33 +1080,32 @@ export default function MailView() {
                 <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
                   <Inbox className="h-10 w-10 text-neutral-400" />
                   <p className="mt-3 text-sm font-medium text-neutral-500">
-                    {needsGmailAuth
-                      ? "Gmail authorization required to sync your inbox"
-                      : `No emails found in ${folderTitle}`}
+                    No emails matching current criteria in {folderTitle}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (needsGmailAuth) {
-                        void handleGrantGmailAccess()
-                      } else {
-                        void syncGmailAutomatically(false)
-                      }
-                    }}
-                    disabled={isGmailSyncing || isGmailAuthorizing}
-                    className="mt-4 flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
-                  >
-                    <GoogleIcon className="h-3.5 w-3.5" />
-                    <span>
-                      {isGmailSyncing
-                        ? "Fetching Emails..."
-                        : isGmailAuthorizing
-                        ? "Connecting to Google..."
-                        : needsGmailAuth
-                        ? "Authorize Gmail Sync"
-                        : "Fetch Emails from Gmail"}
-                    </span>
-                  </button>
+                  <div className="mt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsComposeOpen(true)}
+                      className="flex items-center gap-2 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <span>Compose Email</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void syncGmailAutomatically(false)}
+                      disabled={isGmailSyncing || isGmailAuthorizing}
+                      className="flex items-center gap-2 rounded-full border border-gray-300/80 bg-white hover:bg-neutral-50 text-neutral-700 px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                    >
+                      <GoogleIcon className="h-3.5 w-3.5" />
+                      <span>
+                        {isGmailSyncing
+                          ? "Syncing..."
+                          : isGmailAuthorizing
+                          ? "Connecting..."
+                          : "Sync Gmail"}
+                      </span>
+                    </button>
+                  </div>
                 </div>
               ) : (
                 displayedEmails.map((email) => {
@@ -1904,6 +1917,85 @@ export default function MailView() {
           </>
         )}
       </div>
+
+      {/* Gmail Authorization Modal */}
+      <Dialog open={authModalOpen} onOpenChange={setAuthModalOpen}>
+        <DialogContent className="w-[min(480px,92vw)] overflow-hidden rounded-[28px] border border-gray-300 bg-neutral-100 p-6 shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-gray-200 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-gray-200 shadow-xs">
+                  <GoogleIcon className="h-4 w-4" />
+                </div>
+                <div className="text-base font-bold tracking-tight text-neutral-800">
+                  Gmail Authorization
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAuthModalOpen(false)}
+                className="h-8 w-8 rounded-full border border-gray-200 bg-[#e7e7e6] hover:bg-[#dddddc] text-[#404040] p-0 flex items-center justify-center transition-all hover:scale-105 active:scale-95 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <p className="text-xs leading-relaxed text-neutral-600">
+              {authModalReason ||
+                "To read and sync your emails, Google requires your permission to access your Gmail inbox. Please click below to grant access."}
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setAuthModalOpen(false)}
+                className="rounded-full px-4 py-2 text-xs font-semibold text-neutral-600 hover:bg-[#dededc] cursor-pointer"
+              >
+                Close
+              </Button>
+              {authModalActionUrl ? (
+                <>
+                  <a
+                    href={authModalActionUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all active:scale-95 cursor-pointer"
+                  >
+                    <span>Enable in Google Cloud</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setAuthModalOpen(false)
+                      void syncGmailAutomatically(false)
+                    }}
+                    disabled={isGmailSyncing}
+                    className="flex items-center gap-1.5 rounded-full border border-gray-300 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 shadow-xs cursor-pointer active:scale-95"
+                  >
+                    <span>Retry Sync</span>
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  onClick={async () => {
+                    setAuthModalOpen(false)
+                    await handleGrantGmailAccess()
+                  }}
+                  disabled={isGmailAuthorizing}
+                  className="flex items-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-all active:scale-95 cursor-pointer"
+                >
+                  <GoogleIcon className="h-3.5 w-3.5" />
+                  <span>{isGmailAuthorizing ? "Connecting..." : "Grant Access with Google"}</span>
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -7,6 +7,10 @@ import { classifyEmailsWithKeywords } from "@/services/geminiMailService"
  */
 export async function connectGmailAccount(): Promise<{ error?: string }> {
   try {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("google_provider_token")
+      localStorage.removeItem("google_provider_token_rejected")
+    }
     const origin = window.location.origin
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -41,6 +45,7 @@ export async function getGoogleProviderToken(): Promise<string | null> {
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""))
       const hashProviderToken = hashParams.get("provider_token")
       if (hashProviderToken) {
+        localStorage.removeItem("google_provider_token_rejected")
         localStorage.setItem("google_provider_token", hashProviderToken)
         return hashProviderToken
       }
@@ -51,9 +56,15 @@ export async function getGoogleProviderToken(): Promise<string | null> {
       const searchParams = new URLSearchParams(window.location.search)
       const queryProviderToken = searchParams.get("provider_token")
       if (queryProviderToken) {
+        localStorage.removeItem("google_provider_token_rejected")
         localStorage.setItem("google_provider_token", queryProviderToken)
         return queryProviderToken
       }
+    }
+
+    // If the token was previously rejected for 403 / insufficient scopes, do not reuse it
+    if (localStorage.getItem("google_provider_token_rejected") === "true") {
+      return null
     }
 
     // 3. Check dedicated localStorage cache
@@ -101,7 +112,9 @@ function extractBodyFromPayload(payload: any): string {
   if (payload.body?.data && payload.mimeType === "text/plain") {
     try {
       return atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"))
-    } catch {}
+    } catch {
+      // ignore decoding error
+    }
   }
   if (payload.parts && Array.isArray(payload.parts)) {
     // Check for text/plain parts first
@@ -109,7 +122,9 @@ function extractBodyFromPayload(payload: any): string {
       if (part.mimeType === "text/plain" && part.body?.data) {
         try {
           return atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"))
-        } catch {}
+        } catch {
+          // ignore decoding error
+        }
       }
     }
     // Recursive check for nested parts (multipart/alternative, etc.)
@@ -130,7 +145,9 @@ function extractBodyFromPayload(payload: any): string {
             .replace(/<[^>]+>/g, " ")
             .replace(/\s+/g, " ")
             .trim()
-        } catch {}
+        } catch {
+          // ignore decoding error
+        }
       }
     }
   }
@@ -154,18 +171,44 @@ export async function fetchTop20GmailMessages(
 
   if (!listRes.ok) {
     const errText = await listRes.text()
+    let detailedMsg = errText
+    try {
+      const errJson = JSON.parse(errText)
+      if (errJson?.error?.message) {
+        detailedMsg = errJson.error.message
+      }
+    } catch {
+      // ignore json parse error
+    }
+
+    console.error("Gmail API Error (" + listRes.status + "):", detailedMsg)
+
+    if (detailedMsg.includes("has not been used in project") || detailedMsg.includes("is disabled")) {
+      // Extract enablement URL if Google provided it
+      const match = detailedMsg.match(/https:\/\/console\.developers\.google\.com\/[^\s]+/i)
+      const enableUrl = match ? match[0] : "https://console.cloud.google.com/apis/library/gmail.googleapis.com"
+      const apiErr = new Error(`Gmail API is not enabled in your Google Cloud Project: ${detailedMsg}`)
+      ;(apiErr as any).status = 403
+      ;(apiErr as any).code = "GMAIL_API_DISABLED"
+      ;(apiErr as any).enableUrl = enableUrl
+      throw apiErr
+    }
+
     if (listRes.status === 401 || listRes.status === 403) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("google_provider_token")
+        localStorage.setItem("google_provider_token_rejected", "true")
       }
     }
-    const isScopeError = errText.toLowerCase().includes("scope") || listRes.status === 403
-    if (isScopeError) {
-      const scopeErr = new Error("GMAIL_INSUFFICIENT_SCOPES")
+
+    if (detailedMsg.toLowerCase().includes("scope") || listRes.status === 403) {
+      const scopeErr = new Error(`GMAIL_INSUFFICIENT_SCOPES: ${detailedMsg}`)
       ;(scopeErr as any).status = 403
+      ;(scopeErr as any).code = "GMAIL_INSUFFICIENT_SCOPES"
       throw scopeErr
     }
-    throw new Error(`Gmail API returned ${listRes.status}: ${errText.slice(0, 150)}`)
+
+    throw new Error(`Gmail API returned ${listRes.status}: ${detailedMsg.slice(0, 150)}`)
   }
 
   const listData = await listRes.json()
