@@ -41,6 +41,7 @@ import {
   fetchTop20GmailMessages,
   getGoogleProviderToken,
 } from "@/services/gmailApiService"
+import EmailHtmlViewer from "./EmailHtmlViewer"
 
 function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -1725,10 +1726,11 @@ export default function MailView() {
                   </div>
                 )}
 
-                {/* Email Content Body */}
-                <div className="text-neutral-800 text-sm md:text-base leading-relaxed whitespace-pre-line font-normal">
-                  {selectedEmail.body}
-                </div>
+                {/* Email Content Body (Rich HTML or Typographic Text) */}
+                <EmailHtmlViewer
+                  html={selectedEmail.htmlBody}
+                  plainText={selectedEmail.body}
+                />
 
                 {/* If Selected Email is a Draft: Show Send Draft Action */}
                 {selectedEmail.isDraft ? (

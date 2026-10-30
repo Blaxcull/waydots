@@ -107,51 +107,74 @@ export async function getGoogleProviderToken(): Promise<string | null> {
   }
 }
 
-function extractBodyFromPayload(payload: any): string {
-  if (!payload) return ""
-  if (payload.body?.data && payload.mimeType === "text/plain") {
+export function decodeGmailBase64(base64Str: string): string {
+  if (!base64Str) return ""
+  try {
+    let clean = base64Str.replace(/-/g, "+").replace(/_/g, "/")
+    while (clean.length % 4 !== 0) {
+      clean += "="
+    }
+    const binary = atob(clean)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return new TextDecoder("utf-8").decode(bytes)
+  } catch {
     try {
-      return atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"))
+      return atob(base64Str.replace(/-/g, "+").replace(/_/g, "/"))
     } catch {
-      // ignore decoding error
+      return ""
     }
   }
-  if (payload.parts && Array.isArray(payload.parts)) {
-    // Check for text/plain parts first
-    for (const part of payload.parts) {
-      if (part.mimeType === "text/plain" && part.body?.data) {
-        try {
-          return atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"))
-        } catch {
-          // ignore decoding error
-        }
-      }
+}
+
+export function extractEmailBodies(payload: any): { plainText: string; htmlBody: string } {
+  if (!payload) return { plainText: "", htmlBody: "" }
+
+  let plainText = ""
+  let htmlBody = ""
+
+  function traverse(part: any) {
+    if (!part) return
+
+    const mime = (part.mimeType || "").toLowerCase()
+    const data = part.body?.data
+
+    if (mime === "text/plain" && data) {
+      const decoded = decodeGmailBase64(data)
+      plainText = plainText ? `${plainText}\n\n${decoded}` : decoded
+    } else if (mime === "text/html" && data) {
+      const decoded = decodeGmailBase64(data)
+      htmlBody = htmlBody ? `${htmlBody}<br/>${decoded}` : decoded
     }
-    // Recursive check for nested parts (multipart/alternative, etc.)
-    for (const part of payload.parts) {
-      if (part.parts) {
-        const text = extractBodyFromPayload(part)
-        if (text) return text
-      }
-    }
-    // Check for text/html parts and strip html
-    for (const part of payload.parts) {
-      if (part.mimeType === "text/html" && part.body?.data) {
-        try {
-          const html = atob(part.body.data.replace(/-/g, "+").replace(/_/g, "/"))
-          return html
-            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
-            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
-            .replace(/<[^>]+>/g, " ")
-            .replace(/\s+/g, " ")
-            .trim()
-        } catch {
-          // ignore decoding error
-        }
+
+    if (part.parts && Array.isArray(part.parts)) {
+      for (const subPart of part.parts) {
+        traverse(subPart)
       }
     }
   }
-  return ""
+
+  traverse(payload)
+
+  // If plainText is missing but htmlBody exists, strip tags cleanly for search/snippets/AI
+  if (!plainText && htmlBody) {
+    plainText = htmlBody
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/\s+/g, " ")
+      .trim()
+  }
+
+  return { plainText, htmlBody }
 }
 
 /**
@@ -268,10 +291,11 @@ export async function fetchTop20GmailMessages(
         senderEmail = fromMatch[2].trim()
       }
 
-      // Decode body cleanly or fallback to snippet
-      let body = extractBodyFromPayload(msg.payload) || msg.snippet || ""
-      if (body.length > 2000) {
-        body = body.slice(0, 2000)
+      // Extract rich HTML content and clean plain text representation
+      const { plainText, htmlBody } = extractEmailBodies(msg.payload)
+      let body = plainText || msg.snippet || ""
+      if (!body && htmlBody) {
+        body = msg.snippet || "Email content"
       }
 
       // Relative or formatted timestamp
@@ -301,6 +325,7 @@ export async function fetchTop20GmailMessages(
         senderEmail,
         recipientEmail: effectiveRecipient || "you@waydots.com",
         body,
+        htmlBody: htmlBody || undefined,
         timestamp,
         unread,
         starred,

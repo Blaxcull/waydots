@@ -39,6 +39,7 @@ export interface Email {
   senderEmail: string
   recipientEmail: string
   body: string
+  htmlBody?: string
   timestamp: string
   unread: boolean
   priority: EmailPriority
@@ -108,6 +109,34 @@ const INITIAL_EMAILS: Email[] = [
     senderEmail: "insights@waydots.app",
     recipientEmail: "you@waydots.com",
     body: "Your weekly planning report is ready.\n\n• Weekly Goal Completion: 84%\n• Focus Time Logged: 28.5 hrs\n• Streak: 6 consecutive days on track\n\nKeep up the great momentum!",
+    htmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; padding: 4px; color: #1e293b;">
+        <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 14px; margin-bottom: 18px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 700; color: #0f172a;">Weekly Planning Report</h2>
+          <p style="margin: 4px 0 0; font-size: 13px; color: #64748b;">Summary for week ending Oct 28, 2026</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 22px;">
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center;">
+            <div style="font-size: 22px; font-weight: 800; color: #10b981;">84%</div>
+            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-top: 4px;">Goal Completion</div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center;">
+            <div style="font-size: 22px; font-weight: 800; color: #3b82f6;">28.5h</div>
+            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-top: 4px;">Focus Time</div>
+          </div>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; text-align: center;">
+            <div style="font-size: 22px; font-weight: 800; color: #f59e0b;">6 Days</div>
+            <div style="font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; margin-top: 4px;">Streak</div>
+          </div>
+        </div>
+        <p style="font-size: 14px; line-height: 1.6; color: #334155; margin-bottom: 16px;">
+          Great work this week! Your focus time increased by <strong>12%</strong> compared to last week, and you maintained your streak across all 4 core goals.
+        </p>
+        <div style="margin-top: 20px;">
+          <a href="https://waydots.vercel.app" style="display: inline-block; background: #0f172a; color: #ffffff; text-decoration: none; padding: 9px 18px; border-radius: 9999px; font-size: 12px; font-weight: 600;">View Full Analytics Dashboard &rarr;</a>
+        </div>
+      </div>
+    `,
     timestamp: "Oct 28",
     unread: false,
     starred: true,
@@ -120,6 +149,31 @@ const INITIAL_EMAILS: Email[] = [
     senderEmail: "updates@techradar.io",
     recipientEmail: "you@waydots.com",
     body: "Top engineering stories this month: Deterministic Agentic Workflows, React 19 Compiler deep dive, and the convergence of Calendar & Task tooling in modern workspaces.",
+    htmlBody: `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 620px; color: #1e293b; padding: 4px;">
+        <div style="background: linear-gradient(135deg, #1e293b, #0f172a); color: white; padding: 18px 20px; border-radius: 14px; margin-bottom: 20px;">
+          <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #38bdf8;">Tech Radar Digest</span>
+          <h2 style="margin: 6px 0 4px; font-size: 20px; font-weight: 700;">October 2026 Edition</h2>
+          <p style="margin: 0; font-size: 13px; color: #94a3b8;">The latest breakthroughs in agentic workflows, frontend compilers & tooling.</p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">1. Deterministic Agentic Workflows</h3>
+          <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 10px;">
+            How autonomous coding agents are moving from probabilistic guesswork to deterministic validation loops with live unit tests, compiler checks, and reproducible verification steps.
+          </p>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 6px;">2. React 19 Compiler in Production</h3>
+          <p style="font-size: 14px; line-height: 1.6; color: #475569; margin: 0 0 10px;">
+            Real-world performance gains, automated memoization patterns, and migration benchmarks from large-scale workspaces running React 19.
+          </p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #94a3b8; text-align: center;">
+          You received this email because you subscribed to Tech Radar. <a href="#" style="color: #64748b;">Unsubscribe</a>
+        </p>
+      </div>
+    `,
     timestamp: "Oct 26",
     unread: false,
     starred: false,
