@@ -215,7 +215,7 @@ export default function MeetingSchedulePlanner({
 
           {/* Row 2: Date, Time & Duration Controls */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {/* Date Picker & Quick Presets */}
+            {/* Date Picker */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] font-semibold text-neutral-600 flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
@@ -230,29 +230,6 @@ export default function MeetingSchedulePlanner({
                 }}
                 className="rounded-xl border border-gray-300 bg-white px-2.5 py-1.5 text-xs text-neutral-800 outline-none focus:border-neutral-500 font-medium cursor-pointer"
               />
-              <div className="flex items-center gap-1 mt-1">
-                <button
-                  type="button"
-                  onClick={() => handleSetQuickDate(0)}
-                  className="rounded-md border border-gray-200 bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200"
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetQuickDate(1)}
-                  className="rounded-md border border-gray-200 bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200"
-                >
-                  Tomorrow
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleSetQuickDate(7)}
-                  className="rounded-md border border-gray-200 bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-200"
-                >
-                  +7 Days
-                </button>
-              </div>
             </div>
 
             {/* Time Selector */}
