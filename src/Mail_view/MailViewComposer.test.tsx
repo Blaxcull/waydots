@@ -5,7 +5,8 @@ import { cleanup, render, screen, fireEvent, waitFor } from "@testing-library/re
 import { afterEach, describe, it, expect, vi } from "vitest"
 import MailView from "./MailView"
 import { useEmailStore } from "@/store/emailStore"
-import { sendGmailMessage } from "@/services/gmailApiService"
+import { useAuthStore } from "@/store/authStore"
+import { sendGmailMessage, connectGmailAccount } from "@/services/gmailApiService"
 
 vi.mock("@/services/gmailApiService", () => ({
   connectGmailAccount: vi.fn(),
@@ -339,5 +340,57 @@ describe("MailView Composer & Header Layout", () => {
     await waitFor(() => {
       expect(screen.queryByText("Trashed Newsletter Subject")).not.toBeInTheDocument()
     })
+  })
+
+  it("renders sync button as icon-only refresh button on the right side and reconnects via connectGmailAccount when session is missing", async () => {
+    const store = useEmailStore.getState()
+    store.selectEmail(null)
+    store.setActiveFolder("inbox")
+
+    render(<MailView />)
+
+    // Verify there is an icon-only sync button with aria-label or title
+    const syncBtn = screen.getByRole("button", { name: /Sync Mail/i })
+    expect(syncBtn).toBeInTheDocument()
+    // It should have RotateCw icon child and no text saying "Sync All Mail"
+    expect(screen.queryByText("Sync All Mail")).not.toBeInTheDocument()
+
+    // Clicking sync when session token is missing should call connectGmailAccount
+    fireEvent.click(syncBtn)
+
+    await waitFor(() => {
+      expect(connectGmailAccount).toHaveBeenCalled()
+    })
+  })
+
+  it("displays centered Connect Gmail button when user has not made account with Google and has no token", async () => {
+    const store = useEmailStore.getState()
+    store.selectEmail(null)
+    store.setEmails([]) // No emails
+    store.setActiveFolder("inbox")
+
+    // Set user as non-google account (e.g. email provider)
+    useAuthStore.setState({
+      user: {
+        id: "email-user-123",
+        email: "user@example.com",
+        app_metadata: { provider: "email" },
+      } as any,
+      session: null,
+      isAuthenticated: true,
+      isAuthLoading: false,
+    })
+
+    localStorage.removeItem("google_provider_token")
+
+    render(<MailView />)
+
+    // Center state with "Connect your Gmail" heading and "Connect Gmail" button should be visible
+    expect(screen.getByText("Connect your Gmail")).toBeInTheDocument()
+    const connectBtn = screen.getByRole("button", { name: /Connect Gmail/i })
+    expect(connectBtn).toBeInTheDocument()
+
+    fireEvent.click(connectBtn)
+    expect(connectGmailAccount).toHaveBeenCalled()
   })
 })

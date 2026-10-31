@@ -18,6 +18,7 @@ import {
   Clock,
   AlertTriangle,
   Wand2,
+  RotateCw,
 } from "lucide-react"
 import { useEmailStore, type Email, type EmailPriority } from "@/store/emailStore"
 import { useAuthStore } from "@/store/authStore"
@@ -31,6 +32,7 @@ import {
   syncMeetingAndRescheduleToCalendar,
 } from "@/services/geminiMailService"
 import {
+  connectGmailAccount,
   fetchAllGmailFolders,
   getGoogleProviderToken,
   sendGmailDraft,
@@ -643,6 +645,26 @@ export default function MailView() {
   const [isRefiningDraft, setIsRefiningDraft] = useState(false)
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
   const [isGmailSyncing, setIsGmailSyncing] = useState(false)
+  const [hasGoogleToken, setHasGoogleToken] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false
+    return !!localStorage.getItem("google_provider_token")
+  })
+
+  const isGoogleAccount = useMemo(() => {
+    if (!user) return false
+    const provider = user.app_metadata?.provider
+    const providers = (user.app_metadata as any)?.providers as string[] | undefined
+    const hasGoogleIdentity = user.identities?.some((id) => id.provider === "google")
+    return provider === "google" || (Array.isArray(providers) && providers.includes("google")) || !!hasGoogleIdentity
+  }, [user])
+
+  useEffect(() => {
+    const checkToken = async () => {
+      const token = await getGoogleProviderToken()
+      setHasGoogleToken(!!token)
+    }
+    void checkToken()
+  }, [session])
 
   // Selection state (like Gmail)
   const [selectedEmailIds, setSelectedEmailIds] = useState<string[]>([])
@@ -1232,11 +1254,14 @@ export default function MailView() {
     try {
       const token = await getGoogleProviderToken()
       if (!token) {
+        setHasGoogleToken(false)
         if (!isSilent) {
-          triggerToast("Google session not found. Please log in with Google on the Login page.")
+          triggerToast("Google session not found. Connecting with Google...")
+          void connectGmailAccount()
         }
         return
       }
+      setHasGoogleToken(true)
 
       setIsGmailSyncing(true)
       const liveEmails = await fetchAllGmailFolders(token, loggedInEmail || undefined)
@@ -1279,8 +1304,10 @@ export default function MailView() {
         err?.message?.includes("401") ||
         err?.message?.includes("invalid authentication")
       ) {
+        setHasGoogleToken(false)
         if (!isSilent) {
-          triggerToast("Google session has expired. Please sign in again with Google to reconnect.")
+          triggerToast("Google session has expired. Connecting with Google...")
+          void connectGmailAccount()
         }
       } else if (!isSilent) {
         if (
@@ -1306,6 +1333,32 @@ export default function MailView() {
       setIsGmailSyncing(false)
     }
   }, [loggedInEmail, setEmails])
+
+  const handleSyncMail = useCallback(async () => {
+    try {
+      const token = await getGoogleProviderToken()
+      if (!token) {
+        setHasGoogleToken(false)
+        triggerToast("Google session not found. Connecting with Google...")
+        await connectGmailAccount()
+        return
+      }
+      await syncGmailAutomatically(false)
+    } catch (err: any) {
+      if (
+        err?.status === 401 ||
+        err?.code === "GMAIL_TOKEN_EXPIRED" ||
+        err?.message?.includes("401") ||
+        err?.message?.includes("invalid authentication")
+      ) {
+        setHasGoogleToken(false)
+        triggerToast("Google session expired. Connecting with Google...")
+        await connectGmailAccount()
+      } else {
+        triggerToast(err?.message || "Sync failed")
+      }
+    }
+  }, [syncGmailAutomatically])
 
   // Automatically fetch emails on mount and periodically every 5 minutes in background
   useEffect(() => {
@@ -1715,43 +1768,37 @@ export default function MailView() {
                   </button>
                 </div>
 
-                {/* Sync All Mail Button */}
-                <button
-                  type="button"
-                  onClick={() => syncGmailAutomatically(false)}
-                  disabled={isGmailSyncing}
-                  title="One-click sync for Inbox, Starred, Trash & Sent"
-                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 ${
-                    isGmailSyncing
-                      ? "border-blue-400 bg-blue-50 text-blue-700 shadow-xs"
-                      : "border-gray-300/80 bg-[#e7e7e6] text-neutral-700 hover:bg-[#dddddc] hover:text-neutral-900"
-                  }`}
-                >
-                  {isGmailSyncing ? (
-                    <>
-                      <span className="h-3 w-3 border-2 border-blue-600/40 border-t-blue-600 rounded-full animate-spin" />
-                      <span>Syncing All...</span>
-                    </>
-                  ) : (
-                    <>
-                      <GoogleIcon className="h-3.5 w-3.5" />
-                      <span>Sync All Mail</span>
-                    </>
+                {/* Right-aligned actions: Empty Trash (in trash) and Sync Mail refresh icon */}
+                <div className="ml-auto flex items-center gap-2 shrink-0">
+                  {/* Empty Trash Button on Top Right (only shown in Trash) */}
+                  {activeFolder === "trash" && (
+                    <button
+                      type="button"
+                      onClick={handleEmptyTrash}
+                      disabled={folderEmails.length === 0}
+                      title="Permanently empty all items in Trash"
+                      className="flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                    >
+                      <span>Empty Trash</span>
+                    </button>
                   )}
-                </button>
 
-                {/* Empty Trash Button on Top Right (only shown in Trash) */}
-                {activeFolder === "trash" && (
+                  {/* Google Sync Button: Icon only on the right side */}
                   <button
                     type="button"
-                    onClick={handleEmptyTrash}
-                    disabled={folderEmails.length === 0}
-                    title="Permanently empty all items in Trash"
-                    className="ml-auto flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                    onClick={handleSyncMail}
+                    disabled={isGmailSyncing}
+                    title={isGmailSyncing ? "Syncing mail..." : "Sync Gmail"}
+                    aria-label="Sync Mail"
+                    className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-300/80 bg-[#dededc] hover:bg-[#d0d0ce] text-neutral-700 hover:text-neutral-900 transition-all active:scale-95 cursor-pointer shrink-0 disabled:opacity-50"
                   >
-                    <span>Empty Trash</span>
+                    <RotateCw
+                      className={`h-4 w-4 transition-transform ${
+                        isGmailSyncing ? "animate-spin text-neutral-900" : "text-neutral-600 hover:text-neutral-900"
+                      }`}
+                    />
                   </button>
-                )}
+                </div>
               </div>
 
               {searchQuery && (
@@ -1915,7 +1962,25 @@ export default function MailView() {
 
             {/* Full-Width Email Rows List */}
             <div className="flex-1 overflow-y-auto divide-y divide-gray-200/80 bg-[#ececeb]">
-              {displayedEmails.length === 0 ? (
+              {!isGoogleAccount && !hasGoogleToken && displayedEmails.length === 0 ? (
+                <div className="flex h-full min-h-[420px] flex-col items-center justify-center p-8 text-center bg-[#ececeb]">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xs border border-gray-200/90 mb-4">
+                    <GoogleIcon className="h-8 w-8" />
+                  </div>
+                  <h3 className="text-base font-semibold text-neutral-800 tracking-tight">Connect your Gmail</h3>
+                  <p className="mt-1.5 max-w-sm text-xs text-neutral-500 leading-relaxed">
+                    You haven&apos;t connected your Google account yet. Connect Gmail to sync, read, and manage your emails directly inside Waydots.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void connectGmailAccount()}
+                    className="mt-5 flex items-center gap-2 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white px-5 py-2.5 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                  >
+                    <GoogleIcon className="h-4 w-4" />
+                    <span>Connect Gmail</span>
+                  </button>
+                </div>
+              ) : displayedEmails.length === 0 ? (
                 <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
                   {activeFolder === "trash" ? (
                     <Trash2 className="h-10 w-10 text-neutral-400" />
@@ -1933,15 +1998,28 @@ export default function MailView() {
                     >
                       <span>Compose Email</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void syncGmailAutomatically(false)}
-                      disabled={isGmailSyncing}
-                      className="flex items-center gap-2 rounded-full border border-gray-300/80 bg-white hover:bg-neutral-50 text-neutral-700 px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
-                    >
-                      <GoogleIcon className="h-3.5 w-3.5" />
-                      <span>{isGmailSyncing ? "Syncing All..." : "Sync All Mail"}</span>
-                    </button>
+                    {!hasGoogleToken ? (
+                      <button
+                        type="button"
+                        onClick={() => void connectGmailAccount()}
+                        className="flex items-center gap-2 rounded-full border border-gray-300/80 bg-white hover:bg-neutral-50 text-neutral-700 px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                      >
+                        <GoogleIcon className="h-3.5 w-3.5" />
+                        <span>Connect Gmail</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSyncMail}
+                        disabled={isGmailSyncing}
+                        className="flex items-center gap-2 rounded-full border border-gray-300/80 bg-white hover:bg-neutral-50 text-neutral-700 px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-sm active:scale-95"
+                      >
+                        <RotateCw
+                          className={`h-3.5 w-3.5 ${isGmailSyncing ? "animate-spin text-neutral-800" : ""}`}
+                        />
+                        <span>{isGmailSyncing ? "Syncing..." : "Sync Mail"}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
