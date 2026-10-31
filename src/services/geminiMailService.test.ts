@@ -91,5 +91,43 @@ describe("geminiMailService", () => {
     expect(draft.suggestedSlot).toBeDefined()
     expect(draft.status).toBe("pending_approval")
   })
+
+  it("drafts actual wording tailored to design and prototype review emails", async () => {
+    const designEmail: Email = {
+      id: "email-design",
+      subject: "Design System Review — Waydots v2 Components",
+      senderName: "Alex Morgan",
+      senderEmail: "alex.m@studio.design",
+      recipientEmail: "you@waydots.com",
+      body: "I reviewed the latest icon pill buttons and view switcher interactions. The animations look great! Let me know when the email workspace prototype is ready.",
+      timestamp: "Yesterday",
+      unread: true,
+      priority: "medium",
+    }
+
+    const draft = await generateContextualDraft(designEmail)
+    expect(draft.suggestedReply).toContain("Alex")
+    expect(draft.suggestedReply).toMatch(/review|design|prototype|buttons|animations/i)
+    // Non-meeting email should not have a calendar meeting slot
+    expect(draft.suggestedSlot).toBeUndefined()
+  })
+
+  it("drafts actual wording tailored to security notifications", async () => {
+    const securityEmail: Email = {
+      id: "email-sec",
+      subject: "Security alert: New sign-in detected",
+      senderName: "Google",
+      senderEmail: "no-reply@accounts.google.com",
+      recipientEmail: "you@waydots.com",
+      body: "A new sign-in was detected on your account. Review your recent account activity.",
+      timestamp: "Today",
+      unread: true,
+      priority: "low",
+    }
+
+    const draft = await generateContextualDraft(securityEmail)
+    expect(draft.suggestedReply).toMatch(/security|activity|authorized|verified/i)
+    expect(draft.suggestedSlot).toBeUndefined()
+  })
 })
 

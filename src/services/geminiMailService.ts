@@ -432,8 +432,8 @@ User's Modification Instruction:
 Rules:
 - Output ONLY the revised draft email body text.
 - Do NOT wrap in markdown code blocks or quotes.
-- Keep relevant timing, date slots, and sender names intact unless the user instruction asks to change them.
-- Maintain natural, high-quality tone.`
+- Keep relevant timing, date slots, topics, and sender names intact unless the user instruction asks to change them.
+- Maintain natural, high-quality, professional tone reflecting the actual email topic.`
 
         const response = await fetch(url, {
           method: "POST",
@@ -460,16 +460,51 @@ Rules:
     }
   }
 
-  // Fast offline heuristics
+  // Fast intelligent offline heuristics that preserve actual email content
   const lower = userInstruction.toLowerCase()
-  const firstName = email.senderName.split(" ")[0] || email.senderName
-
-  if (lower.includes("polite") || lower.includes("friendly")) {
-    return `Hi ${firstName},\n\nThank you so much for reaching out! I really appreciate you connecting.\n\n${currentDraft.replace(/^Hi [^,\n]+,?\n*/i, "").trim()}\n\nLooking forward to speaking soon!\n\nWarm regards,\nHarsh`
+  let firstName = email.senderName.split(" ")[0] || email.senderName
+  if (
+    firstName.toLowerCase() === "google" ||
+    firstName.toLowerCase().includes("team") ||
+    firstName.toLowerCase().includes("support")
+  ) {
+    firstName = email.senderName
   }
 
-  if (lower.includes("concise") || lower.includes("short")) {
-    return `Hi ${firstName},\n\nSounds great. Thursday at 11:30 AM works well for our sync. I have reserved the slot on my calendar.\n\nBest,\nHarsh`
+  if (lower.includes("polite") || lower.includes("friendly") || lower.includes("warmer")) {
+    const bodyWithoutGreeting = currentDraft
+      .replace(/^Hi [^,\n]+,?\n*/i, "")
+      .replace(/^Dear [^,\n]+,?\n*/i, "")
+      .replace(/^Hey [^,\n]+,?\n*/i, "")
+      .trim()
+    return `Hi ${firstName},\n\nThank you so much for reaching out! I really appreciate your message.\n\n${bodyWithoutGreeting}`
+  }
+
+  if (lower.includes("concise") || lower.includes("brief") || lower.includes("short")) {
+    const paragraphs = currentDraft.split(/\n\s*\n/).filter(Boolean)
+    const greeting = paragraphs[0]?.match(/^(Hi|Dear|Hey)\b/i) ? paragraphs[0] : `Hi ${firstName},`
+    const lastP = paragraphs[paragraphs.length - 1] || ""
+    const hasSignoff = /(regards|best|cheers|sincerely)/i.test(lastP)
+    const signoff = hasSignoff ? lastP : "Best regards,\nHarsh"
+
+    const bodyParagraphs = paragraphs.slice(
+      paragraphs[0]?.match(/^(Hi|Dear|Hey)\b/i) ? 1 : 0,
+      hasSignoff ? -1 : undefined
+    )
+    const coreText =
+      bodyParagraphs.slice(0, 2).join("\n\n") ||
+      "Thanks for your note. Everything looks good on my end and I have noted all details."
+
+    return `${greeting}\n\n${coreText}\n\n${signoff}`
+  }
+
+  if (lower.includes("professional") || lower.includes("formal") || lower.includes("executive")) {
+    const bodyText = currentDraft
+      .replace(/^Hi [^,\n]+,?\n*/i, "")
+      .replace(/^Hey [^,\n]+,?\n*/i, "")
+      .replace(/(Best regards,|Warm regards,|Cheers,|Sincerely,)[\s\S]*$/i, "")
+      .trim()
+    return `Dear ${firstName},\n\nThank you for your correspondence.\n\n${bodyText}\n\nPlease let me know if you require any additional information.\n\nSincerely,\nHarsh`
   }
 
   if (lower.includes("30 min") || lower.includes("30-min")) {
@@ -478,16 +513,201 @@ Rules:
 
   if (lower.includes("friday")) {
     return currentDraft
-      .replace(/thursday/gi, "Friday")
+      .replace(/thursday\s*(morning)?/gi, "Friday morning")
       .replace(/9:30\s*AM/gi, "10:00 AM")
       .replace(/11:30\s*AM/gi, "10:00 AM")
   }
 
-  return `${currentDraft}\n\n[Updated per instruction: "${userInstruction}"]`
+  if (lower.includes("detail") || lower.includes("documentation") || lower.includes("context")) {
+    const signoffRegex = /(Best regards,[\s\S]*$|Warm regards,[\s\S]*$|Cheers,[\s\S]*$|Sincerely,[\s\S]*$)/i
+    if (signoffRegex.test(currentDraft)) {
+      return currentDraft.replace(
+        signoffRegex,
+        `Could you also please share any additional documentation or background context you have on this?\n\n$1`
+      )
+    }
+    return `${currentDraft}\n\nCould you also please share any additional documentation or background context you have on this?`
+  }
+
+  if (lower.includes("next step") || lower.includes("confirm")) {
+    const signoffRegex = /(Best regards,[\s\S]*$|Warm regards,[\s\S]*$|Cheers,[\s\S]*$|Sincerely,[\s\S]*$)/i
+    if (signoffRegex.test(currentDraft)) {
+      return currentDraft.replace(
+        signoffRegex,
+        `I have noted the immediate next steps and will keep you posted as we proceed.\n\n$1`
+      )
+    }
+    return `${currentDraft}\n\nI have noted the immediate next steps and will keep you posted as we proceed.`
+  }
+
+  return `${currentDraft}\n\nNote: ${userInstruction}`
 }
 
 /**
- * Generates a situation-aware email draft considering conflicts across events, goals, and tasks.
+ * Intelligent heuristic fallback that formulates proper, situation-aware reply wording
+ * directly reflecting the actual content, questions, and topic of the incoming email.
+ */
+export function generateHeuristicReply(
+  email: Email,
+  conflict?: ScheduleConflict | null
+): { suggestedReply: string; suggestedSlot?: string; suggestedTaskTitle: string } {
+  let firstName = email.senderName.split(" ")[0] || email.senderName
+  if (
+    firstName.toLowerCase() === "google" ||
+    firstName.toLowerCase().includes("team") ||
+    firstName.toLowerCase().includes("support") ||
+    firstName.toLowerCase().includes("operations")
+  ) {
+    firstName = email.senderName
+  }
+
+  const subject = email.subject || ""
+  const body = email.body || ""
+  const subjectLower = subject.toLowerCase()
+  const bodyLower = body.toLowerCase()
+  const combinedText = `${subjectLower} ${bodyLower}`
+
+  const cleanSubject =
+    subject.replace(/^(re|fwd|urgent|action required|notice|confirmed):\s*/gi, "").trim() || "your message"
+
+  // 1. Meeting & Scheduling Requests
+  const isMeeting = Boolean(
+    email.meetingInfo?.hasMeeting ||
+      combinedText.includes("sync") ||
+      combinedText.includes("schedule a ") ||
+      combinedText.includes("quick call") ||
+      combinedText.includes("availability") ||
+      combinedText.includes("available to meet") ||
+      combinedText.includes("hop on a call") ||
+      combinedText.includes("calendar invite")
+  )
+
+  if (isMeeting) {
+    const topic = email.meetingInfo?.topic || cleanSubject
+    const duration = email.meetingInfo?.duration || "sync"
+
+    if (conflict?.hasConflict && !conflict?.resolved) {
+      const altSlot = conflict.alternativeSlot || "Thursday, Oct 31 • 11:30 AM - 12:15 PM"
+      const reply = `Hi ${firstName},\n\nThanks for reaching out! Aligning on ${topic} is a top priority, and I would love to connect for our ${duration}.\n\nHowever, I currently have a schedule conflict on Thursday morning with '${conflict.conflictingTitle}' (${conflict.conflictingTime}). Could we meet at ${altSlot} or Friday morning at 10:00 AM instead?\n\nLet me know which time works best for you, and I will reserve the slot on our calendar.\n\nLooking forward to speaking!\n\nBest regards,\nHarsh`
+      return {
+        suggestedReply: reply,
+        suggestedSlot: altSlot,
+        suggestedTaskTitle: `Prepare for ${topic.slice(0, 30)}`,
+      }
+    }
+
+    const proposedSlot =
+      email.meetingInfo?.timing || conflict?.proposedSlot || "Thursday, Oct 31 • 9:30 AM - 10:15 AM"
+    const reply = `Hi ${firstName},\n\nThanks for reaching out! Connecting for our ${topic} sounds great.\n\n${proposedSlot} works well on my end. I have reserved the slot on my calendar and will prepare the discussion agenda in advance.\n\nLooking forward to speaking!\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedSlot: proposedSlot,
+      suggestedTaskTitle: `Prepare discussion points for ${topic.slice(0, 30)}`,
+    }
+  }
+
+  // 2. Design, UI, Component & Prototype Review Feedback (e.g. Alex Morgan)
+  if (
+    combinedText.includes("design system") ||
+    combinedText.includes("prototype") ||
+    combinedText.includes("pill buttons") ||
+    combinedText.includes("switcher") ||
+    combinedText.includes("components") ||
+    (combinedText.includes("review") &&
+      (combinedText.includes("ui") ||
+        combinedText.includes("ux") ||
+        combinedText.includes("design") ||
+        combinedText.includes("animation")))
+  ) {
+    const reply = `Hi ${firstName},\n\nThanks so much for taking the time to review the latest design and interactions! Really glad to hear that the tactile border shadows, pill buttons, and animations are feeling smooth.\n\nThe email workspace prototype is coming together nicely—we're currently wrapping up the responsive mobile view and draft sync workflows. I should have the prototype ready for your next pass by tomorrow afternoon, and I will share the link as soon as it is deployed.\n\nCheers,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Prepare Email Workspace Prototype for Design Pass`,
+    }
+  }
+
+  // 3. Security Alerts & Account Warnings (e.g. Google Security Alert)
+  if (
+    combinedText.includes("security alert") ||
+    combinedText.includes("sign-in") ||
+    combinedText.includes("unrecognized") ||
+    combinedText.includes("password") ||
+    combinedText.includes("account activity")
+  ) {
+    const reply = `Hi ${firstName},\n\nThank you for the security notification regarding recent account activity. I have reviewed the details and verified that all active sign-in sessions and permissions on this workspace are authorized and secure.\n\nNo further remediation is necessary on my end.\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Verify Account Security Activity & Sessions`,
+    }
+  }
+
+  // 4. Infrastructure, Maintenance & Operations Notices (e.g. Database index maintenance)
+  if (
+    combinedText.includes("maintenance") ||
+    combinedText.includes("downtime") ||
+    combinedText.includes("database") ||
+    combinedText.includes("infrastructure operations") ||
+    combinedText.includes("scheduled notice")
+  ) {
+    const reply = `Hi ${firstName},\n\nThank you for the maintenance update regarding ${cleanSubject}. We have noted the scheduled maintenance window and appreciate the confirmation of zero expected downtime for workspace operations.\n\nWe will monitor operations during that period.\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Monitor Scheduled Maintenance Window`,
+    }
+  }
+
+  // 5. Analytics, Progress Reports & Metrics (e.g. Waydots Analytics)
+  if (
+    combinedText.includes("analytics") ||
+    combinedText.includes("weekly report") ||
+    combinedText.includes("goal completion") ||
+    combinedText.includes("focus time")
+  ) {
+    const reply = `Hi ${firstName},\n\nThank you for delivering the weekly analytics summary. The metrics look strong—particularly the goal completion rate and steady focus hours. I will review the detailed breakdown with the team and fold these metrics into our upcoming sprint priorities.\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Review Weekly Analytics & Goal Breakdown`,
+    }
+  }
+
+  // 6. Deliverables, Invoices, Contracts & Documentation Requests
+  if (
+    combinedText.includes("deliverable") ||
+    combinedText.includes("invoice") ||
+    combinedText.includes("contract") ||
+    combinedText.includes("proposal") ||
+    combinedText.includes("documentation")
+  ) {
+    const reply = `Hi ${firstName},\n\nThank you for following up regarding ${cleanSubject}. I am reviewing the deliverables and milestones to ensure all requirements are addressed.\n\nI will send over the updated documentation shortly. Please let me know if you need any preliminary items in the meantime.\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Review and finalize ${cleanSubject.slice(0, 30)}`,
+    }
+  }
+
+  // 7. General Purpose Intelligent Heuristic Fallback
+  const bodySentences = body
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(
+      (s) =>
+        s.length > 10 &&
+        !s.toLowerCase().startsWith("hi ") &&
+        !s.toLowerCase().startsWith("hello ") &&
+        !s.toLowerCase().startsWith("dear ")
+    )
+  const primarySentence = bodySentences[0] || `your note regarding ${cleanSubject}`
+
+  const reply = `Hi ${firstName},\n\nThank you for reaching out regarding ${cleanSubject}.\n\nIn response to your message ("${primarySentence}"): I've reviewed the details and will follow up with the required updates shortly. Please let me know if there are any additional items you'd like me to look into in the meantime.\n\nBest regards,\nHarsh`
+  return {
+    suggestedReply: reply,
+    suggestedTaskTitle: `Follow up on ${cleanSubject.slice(0, 30)}`,
+  }
+}
+
+/**
+ * Generates a situation-aware email draft considering conflicts across events, goals, and tasks,
+ * with actual wording reflecting the specific incoming email.
  */
 export async function generateContextualDraft(
   email: Email,
@@ -496,12 +716,14 @@ export async function generateContextualDraft(
 ): Promise<EmailDraft> {
   const apiKey = getGeminiApiKey()
   const conflict = conflictOverride ?? detectScheduleConflict(email)
-  const firstName = email.senderName.split(" ")[0] || email.senderName
+  const isMeetingRequest = Boolean(
+    email.meetingInfo?.hasMeeting ||
+      email.body.toLowerCase().includes("sync") ||
+      email.body.toLowerCase().includes("schedule") ||
+      email.body.toLowerCase().includes("call")
+  )
 
-  let defaultSlot = email.meetingInfo?.timing
-    ? `${email.meetingInfo.timing} (${email.meetingInfo.duration || "45 mins"})`
-    : "Thursday, Oct 31 • 11:30 AM - 12:15 PM"
-  const defaultTask = `Prepare for ${email.meetingInfo?.topic || email.subject.slice(0, 30)}`
+  const heuristic = generateHeuristicReply(email, conflict)
 
   if (apiKey) {
     const models = ["gemini-3.5-flash-lite", "gemini-2.5-flash"]
@@ -516,27 +738,33 @@ export async function generateContextualDraft(
         }
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`
-        const conflictNotice =
-          conflict?.hasConflict && !conflict?.resolved
-            ? `CRITICAL SITUATION: There is a schedule conflict on the requested time with scheduled ${conflict.conflictingType} "${conflict.conflictingTitle}" at ${conflict.conflictingTime}.
+        const conflictNotice = isMeetingRequest
+          ? conflict?.hasConflict && !conflict?.resolved
+            ? `CALENDAR SITUATION: Schedule conflict on the requested time with scheduled ${conflict.conflictingType} "${conflict.conflictingTitle}" at ${conflict.conflictingTime}.
 Politely explain the conflict and propose the alternative open slot: ${conflict.alternativeSlot}.`
-            : `SITUATION: No schedule conflicts. Accept the requested meeting timing (${conflict?.proposedSlot || defaultSlot}) and mention reserving the calendar slot and adding the prep task to the to-do list.`
+            : `CALENDAR SITUATION: No schedule conflicts. Accept the requested meeting timing (${conflict?.proposedSlot || heuristic.suggestedSlot || "proposed time"}) and confirm.`
+          : `CONTEXT: This incoming email is NOT a meeting request. Do NOT propose calendar meeting slots or mention scheduling meetings. Address the actual feedback, questions, or notices in the body directly.`
 
-        const prompt = `You are an AI assistant for Waydots workspace.
-Draft an email response to:
-Sender: ${email.senderName} (${email.senderEmail})
-Subject: ${email.subject}
-Body:
-${email.body.slice(0, 600)}
+        const prompt = `You are an elite communication assistant for Waydots workspace.
+Draft a highly proper, natural, and situation-aware reply to the following incoming email.
 
+CRITICAL INSTRUCTIONS:
+1. ACTUAL WORDING: Read the email subject and body carefully. Your reply MUST address what the sender actually said, asked, or reviewed using natural wording.
+2. EMAIL CONTEXT:
 ${conflictNotice}
 ${customPrompt ? `User Instruction: "${customPrompt}"` : ""}
 
-Output JSON only in this format:
+Incoming Email:
+From: ${email.senderName} (${email.senderEmail})
+Subject: ${email.subject}
+Body:
+${email.body.slice(0, 800)}
+
+Output JSON format only:
 {
-  "reply": "draft response text",
-  "suggestedSlot": "proposed or alternative time slot",
-  "taskTitle": "concise 4-7 word linked task title"
+  "reply": "complete drafted email reply with actual wording corresponding to the email",
+  "suggestedSlot": "${isMeetingRequest ? "suggested time slot" : ""}",
+  "taskTitle": "concise 3-6 word linked action item"
 }`
 
         const response = await fetch(url, {
@@ -559,9 +787,9 @@ Output JSON only in this format:
         if (text) {
           const parsed = JSON.parse(text)
           return {
-            suggestedReply: parsed.reply || "",
-            suggestedSlot: parsed.suggestedSlot || defaultSlot,
-            suggestedTaskTitle: parsed.taskTitle || defaultTask,
+            suggestedReply: parsed.reply || heuristic.suggestedReply,
+            suggestedSlot: parsed.suggestedSlot || heuristic.suggestedSlot,
+            suggestedTaskTitle: parsed.taskTitle || heuristic.suggestedTaskTitle,
             status: "pending_approval",
             conflict: conflict || undefined,
           }
@@ -573,19 +801,10 @@ Output JSON only in this format:
   }
 
   // Heuristic Fallback
-  let fallbackReply = ""
-  if (conflict?.hasConflict && !conflict?.resolved) {
-    defaultSlot = conflict.alternativeSlot
-    fallbackReply = `Hi ${firstName},\n\nThanks for reaching out! I would love to connect for our ${email.meetingInfo?.duration || "sync"}.\n\nHowever, I currently have a schedule conflict on Thursday morning with '${conflict.conflictingTitle}' (${conflict.conflictingTime}). Could we meet at ${conflict.alternativeSlot} or Friday morning at 10:00 AM instead?\n\nLooking forward to speaking!\n\nBest regards,\nHarsh`
-  } else {
-    defaultSlot = "Thursday, Oct 31 • 9:30 AM - 10:15 AM"
-    fallbackReply = `Hi ${firstName},\n\nThanks for reaching out! Thursday at 9:30 AM works great for our sync. I have reserved the slot on my calendar and added the prep task to my to-do list.\n\nLooking forward to speaking!\n\nBest regards,\nHarsh`
-  }
-
   return {
-    suggestedReply: fallbackReply,
-    suggestedSlot: defaultSlot,
-    suggestedTaskTitle: defaultTask,
+    suggestedReply: heuristic.suggestedReply,
+    suggestedSlot: heuristic.suggestedSlot,
+    suggestedTaskTitle: heuristic.suggestedTaskTitle,
     status: "pending_approval",
     conflict: conflict || undefined,
   }

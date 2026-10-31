@@ -1642,7 +1642,7 @@ export default function MailView() {
 
                     {/* Proposed Slot & Linked Task Previews */}
                     <div className="mt-3.5 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {selectedEmail.aiDraft.suggestedSlot && (
+                      {selectedEmail.meetingInfo?.hasMeeting && selectedEmail.aiDraft.suggestedSlot && (
                         <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2.5 text-neutral-800">
                           <Calendar className="h-4 w-4 text-neutral-600 shrink-0" />
                           <div>
@@ -1657,7 +1657,7 @@ export default function MailView() {
                         <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2.5 text-neutral-800">
                           <CheckSquare className="h-4 w-4 text-neutral-600 shrink-0" />
                           <div>
-                            <div className="font-semibold text-neutral-900">Linked To-Do Task</div>
+                            <div className="font-semibold text-neutral-900">Linked Action Item</div>
                             <div className="text-[11px] text-neutral-600 truncate">
                               {selectedEmail.aiDraft.suggestedTaskTitle}
                             </div>
@@ -1696,11 +1696,18 @@ export default function MailView() {
                       {/* Quick prompt suggestion chips */}
                       <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                         {[
-                          { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express excitement to sync" },
+                          { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
                           { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
-                          { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
-                          { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
                           { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
+                          ...(selectedEmail.meetingInfo?.hasMeeting
+                            ? [
+                                { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
+                                { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
+                              ]
+                            : [
+                                { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
+                                { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
+                              ]),
                         ].map((chip) => (
                           <button
                             key={chip.label}
