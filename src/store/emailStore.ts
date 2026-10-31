@@ -364,7 +364,7 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         return {
           ...e,
           unread: false,
-          aiDraft: e.aiDraft ? { ...e.aiDraft, status: "approved" as const } : undefined,
+          aiDraft: undefined,
           body: `${e.body}\n\n--- Sent Reply (${state.senderAccount}) ---\n${bodyToSend}`,
         }
       })
@@ -461,6 +461,8 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         e.id === emailId
           ? {
               ...e,
+              unread: false,
+              aiDraft: undefined,
               body: `${e.body}\n\n--- Sent Reply (${state.senderAccount}) ---\n${replyText}`,
             }
           : e

@@ -84,7 +84,7 @@ interface SmartReplyComposerProps {
   onResolveAlternative: () => void
   onAcceptAndReschedule: () => void
   onClearDraft: () => void
-  onSendReply: () => void
+  onSendReply: (text: string) => void
 }
 
 const SmartReplyComposer = memo(function SmartReplyComposer({
@@ -341,17 +341,11 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
           <Button
             type="button"
             disabled={!replyText.trim() || isSending}
-            onClick={onSendReply}
+            onClick={() => onSendReply(replyText)}
             className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
           >
             <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
-            <span>
-              {isSending
-                ? "Sending..."
-                : email.meetingInfo?.hasMeeting
-                ? "Send & Sync to Calendar"
-                : "Send Reply"}
-            </span>
+            <span>{isSending ? "Sending..." : "Send Reply"}</span>
           </Button>
         </div>
       </div>
@@ -530,7 +524,6 @@ export default function MailView() {
     setPriorityFilter,
     setSortByPriority,
     setEmails,
-    approveAiDraftAndSend,
     dismissAiDraft,
     updateEmailDraft,
     resolveDraftConflict,
@@ -820,10 +813,16 @@ export default function MailView() {
     return false
   }
 
-  const handleSendReply = async (email: Email) => {
-    const finalContent =
-      draftEditText !== null ? draftEditText : email.aiDraft?.suggestedReply || ""
-    if (!finalContent.trim()) {
+  const handleSendReply = async (email: Email, textToSend?: string) => {
+    const finalContent = (
+      textToSend !== undefined
+        ? textToSend
+        : draftEditText !== null
+        ? draftEditText
+        : email.aiDraft?.suggestedReply || ""
+    ).trim()
+
+    if (!finalContent) {
       triggerToast("Reply message cannot be empty")
       return
     }
@@ -833,7 +832,7 @@ export default function MailView() {
       const result = await sendGmailMessage({
         to: email.senderEmail,
         subject: email.subject.startsWith("Re:") ? email.subject : `Re: ${email.subject}`,
-        body: finalContent.trim(),
+        body: finalContent,
         threadId: email.threadId,
         senderAccount,
       })
@@ -847,32 +846,35 @@ export default function MailView() {
         return
       }
 
+      // Both manual and generated replies use the exact same sending pathway
+      sendReply(email.id, finalContent)
       if (email.aiDraft) {
-        approveAiDraftAndSend(email.id, finalContent.trim())
-      } else {
-        sendReply(email.id, finalContent.trim())
+        dismissAiDraft(email.id)
       }
-
-      if (email.meetingInfo?.hasMeeting && email.aiDraft) {
-        const isRescheduled =
-          email.aiDraft.conflict?.resolved &&
-          email.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
-
-        await syncMeetingAndRescheduleToCalendar({
-          email,
-          slot: email.aiDraft.suggestedSlot || email.meetingInfo.timing || "Thursday, Oct 31 • 9:30 AM",
-          taskTitle: email.aiDraft.suggestedTaskTitle,
-          conflictingTitle: email.aiDraft.conflict?.conflictingTitle,
-          rescheduledToTime: isRescheduled
-            ? { start: 14 * 60, end: 15 * 60, label: "2:00 PM - 3:00 PM" }
-            : undefined,
-        })
-        triggerToast("Reply sent! Meeting scheduled & synced with Calendar.")
-      } else {
-        triggerToast("Reply sent successfully! Copy added to Sent folder.")
-      }
-
       setDraftEditText("")
+
+      // Non-blocking calendar sync if meeting info exists
+      if (email.meetingInfo?.hasMeeting) {
+        try {
+          const isRescheduled =
+            email.aiDraft?.conflict?.resolved &&
+            email.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
+
+          void syncMeetingAndRescheduleToCalendar({
+            email,
+            slot: email.aiDraft?.suggestedSlot || email.meetingInfo.timing || "Thursday, Oct 31 • 9:30 AM",
+            taskTitle: email.aiDraft?.suggestedTaskTitle,
+            conflictingTitle: email.aiDraft?.conflict?.conflictingTitle,
+            rescheduledToTime: isRescheduled
+              ? { start: 14 * 60, end: 15 * 60, label: "2:00 PM - 3:00 PM" }
+              : undefined,
+          }).catch(() => {})
+        } catch {
+          // ignore
+        }
+      }
+
+      triggerToast("Reply sent successfully! Copy added to Sent folder.")
     } catch (err: any) {
       if (!handleScopeErrorIfPresent({ error: err?.message })) {
         triggerToast(`Error sending reply: ${err?.message || "Unknown error"}`)
@@ -2125,7 +2127,9 @@ export default function MailView() {
                     replyText={
                       draftEditText !== null
                         ? draftEditText
-                        : selectedEmail.aiDraft?.suggestedReply || ""
+                        : selectedEmail.aiDraft && selectedEmail.aiDraft.status !== "dismissed"
+                        ? selectedEmail.aiDraft.suggestedReply
+                        : ""
                     }
                     onReplyTextChange={(val) => setDraftEditText(val)}
                     isGeneratingDraft={isGeneratingDraft}
@@ -2143,7 +2147,7 @@ export default function MailView() {
                         dismissAiDraft(selectedEmail.id)
                       }
                     }}
-                    onSendReply={() => handleSendReply(selectedEmail)}
+                    onSendReply={(text) => handleSendReply(selectedEmail, text)}
                   />
                 )}
               </div>
