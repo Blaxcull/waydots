@@ -77,6 +77,7 @@ export default function MailView() {
     senderAccount,
     availableSenders,
     selectEmail,
+    setActiveFolder,
     setSearchQuery,
     setSenderAccount,
     setLoggedInUserEmail,
@@ -102,6 +103,11 @@ export default function MailView() {
 
   const [replyText, setReplyText] = useState("")
   const [draftEditText, setDraftEditText] = useState<string | null>(null)
+
+  // Reset local draft text when switching selected emails
+  useEffect(() => {
+    setDraftEditText(null)
+  }, [selectedEmailId])
   const [sentToast, setSentToast] = useState<string | null>(null)
   const [trashToast, setTrashToast] = useState<{
     message: string
@@ -339,9 +345,14 @@ export default function MailView() {
   const handleApproveDraft = async (email: Email) => {
     const finalContent =
       draftEditText !== null ? draftEditText : email.aiDraft?.suggestedReply || ""
+    if (!finalContent.trim()) {
+      triggerToast("Draft message cannot be empty")
+      return
+    }
+
     approveAiDraftAndSend(email.id, finalContent)
 
-    if (email.aiDraft) {
+    if (email.meetingInfo?.hasMeeting && email.aiDraft) {
       const isRescheduled =
         email.aiDraft.conflict?.resolved &&
         email.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
@@ -355,10 +366,12 @@ export default function MailView() {
           ? { start: 14 * 60, end: 15 * 60, label: "2:00 PM - 3:00 PM" }
           : undefined,
       })
+      triggerToast("Draft sent! Meeting scheduled & synced with Calendar.")
+    } else {
+      triggerToast("Draft sent successfully! Copy added to Sent folder.")
     }
 
     setDraftEditText(null)
-    triggerToast("Email sent! Meeting scheduled & synced with Calendar and To-Do list.")
   }
 
   const handleResolveConflictWithAlternative = (email: Email) => {
@@ -594,8 +607,11 @@ export default function MailView() {
   }
 
   const handleSendDraft = (draftId: string) => {
-    sendDraft(draftId)
-    triggerToast("Draft sent successfully!")
+    const textToSend = draftEditText !== null ? draftEditText : undefined
+    sendDraft(draftId, textToSend)
+    setDraftEditText(null)
+    setActiveFolder("sent")
+    triggerToast("Draft sent successfully! Moved to Sent folder.")
   }
 
   const handleSendCompose = () => {
@@ -1716,17 +1732,21 @@ export default function MailView() {
                           type="button"
                           variant="ghost"
                           onClick={() => dismissAiDraft(selectedEmail.id)}
-                          className="rounded-full text-xs font-semibold text-neutral-600 hover:bg-black/5 px-4 py-2"
+                          className="rounded-full text-xs font-semibold text-neutral-600 hover:bg-black/5 px-4 py-2 cursor-pointer"
                         >
                           Dismiss
                         </Button>
                         <Button
                           type="button"
                           onClick={() => handleApproveDraft(selectedEmail)}
-                          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95"
+                          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
                         >
-                          <Send className="mr-1.5 h-3.5 w-3.5" />
-                          Approve &amp; Sync to Calendar
+                          <Send className="h-3.5 w-3.5" />
+                          <span>
+                            {selectedEmail.meetingInfo?.hasMeeting
+                              ? "Send & Sync to Calendar"
+                              : "Send Draft"}
+                          </span>
                         </Button>
                       </div>
                     </div>
@@ -1739,17 +1759,31 @@ export default function MailView() {
                   plainText={selectedEmail.body}
                 />
 
-                {/* If Selected Email is a Draft: Show Send Draft Action */}
+                {/* If Selected Email is a Draft: Show Send Draft Action & Editable Box */}
                 {selectedEmail.isDraft ? (
-                  <div className="mt-6 flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={() => handleSendDraft(selectedEmail.id)}
-                      className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95"
-                    >
-                      <Send className="mr-1.5 h-3.5 w-3.5" />
-                      Send Draft
-                    </Button>
+                  <div className="mt-6 flex flex-col gap-3">
+                    <div className="rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4">
+                      <div className="text-xs font-semibold text-neutral-600 mb-2">
+                        Draft Message Content (Edit before sending)
+                      </div>
+                      <textarea
+                        rows={4}
+                        value={draftEditText !== null ? draftEditText : selectedEmail.body}
+                        onChange={(e) => setDraftEditText(e.target.value)}
+                        placeholder="Draft content..."
+                        className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans"
+                      />
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        onClick={() => handleSendDraft(selectedEmail.id)}
+                        className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        <span>Send Draft</span>
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   /* Manual Reply Form */

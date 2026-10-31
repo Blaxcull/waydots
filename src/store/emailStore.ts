@@ -246,7 +246,7 @@ interface EmailStoreState {
   updateEmailDraft: (id: string, updates: Partial<EmailDraft>) => void
   resolveDraftConflict: (id: string, resolution: "alternative" | "reschedule") => void
   sendReply: (emailId: string, replyText: string) => void
-  sendDraft: (draftId: string) => void
+  sendDraft: (draftId: string, updatedBody?: string) => void
   deleteEmail: (id: string) => void
   restoreDeletedEmails: (emails: Email[]) => void
   markBatchAsRead: (ids: string[]) => void
@@ -332,19 +332,43 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
     }),
 
   approveAiDraftAndSend: (id, finalReplyText) =>
-    set((state) => ({
-      emails: state.emails.map((e) => {
+    set((state) => {
+      const targetEmail = state.emails.find((e) => e.id === id)
+      if (!targetEmail) return state
+
+      const bodyToSend = finalReplyText || targetEmail.aiDraft?.suggestedReply || ""
+
+      const sentEmail: Email = {
+        id: `email-sent-${Date.now()}`,
+        subject: targetEmail.subject.startsWith("Re: ")
+          ? targetEmail.subject
+          : `Re: ${targetEmail.subject}`,
+        senderName: "You",
+        senderEmail: state.senderAccount,
+        recipientEmail: targetEmail.senderEmail,
+        body: bodyToSend,
+        timestamp: "Just now",
+        unread: false,
+        starred: false,
+        isDraft: false,
+        isSent: true,
+        priority: targetEmail.priority,
+      }
+
+      const updatedEmails = state.emails.map((e) => {
         if (e.id !== id) return e
-        const bodyToSend = finalReplyText || e.aiDraft?.suggestedReply || ""
         return {
           ...e,
           unread: false,
-          aiDraft: e.aiDraft ? { ...e.aiDraft, status: "approved" } : undefined,
-          isSent: true,
+          aiDraft: e.aiDraft ? { ...e.aiDraft, status: "approved" as const } : undefined,
           body: `${e.body}\n\n--- Sent Reply (${state.senderAccount}) ---\n${bodyToSend}`,
         }
-      }),
-    })),
+      })
+
+      return {
+        emails: [sentEmail, ...updatedEmails],
+      }
+    }),
 
   dismissAiDraft: (id) =>
     set((state) => ({
@@ -408,24 +432,48 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
     })),
 
   sendReply: (emailId, replyText) =>
-    set((state) => ({
-      emails: state.emails.map((e) =>
+    set((state) => {
+      const targetEmail = state.emails.find((e) => e.id === emailId)
+      if (!targetEmail) return state
+
+      const sentEmail: Email = {
+        id: `email-sent-${Date.now()}`,
+        subject: targetEmail.subject.startsWith("Re: ")
+          ? targetEmail.subject
+          : `Re: ${targetEmail.subject}`,
+        senderName: "You",
+        senderEmail: state.senderAccount,
+        recipientEmail: targetEmail.senderEmail,
+        body: replyText,
+        timestamp: "Just now",
+        unread: false,
+        starred: false,
+        isDraft: false,
+        isSent: true,
+        priority: targetEmail.priority,
+      }
+
+      const updatedEmails = state.emails.map((e) =>
         e.id === emailId
           ? {
               ...e,
-              isSent: true,
               body: `${e.body}\n\n--- Sent Reply (${state.senderAccount}) ---\n${replyText}`,
             }
           : e
-      ),
-    })),
+      )
 
-  sendDraft: (draftId) =>
+      return {
+        emails: [sentEmail, ...updatedEmails],
+      }
+    }),
+
+  sendDraft: (draftId, updatedBody) =>
     set((state) => ({
       emails: state.emails.map((e) =>
         e.id === draftId
           ? {
               ...e,
+              body: updatedBody !== undefined ? updatedBody : e.body,
               isDraft: false,
               isSent: true,
               timestamp: "Just now",
