@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { decodeGmailBase64, extractEmailBodies, fetchAllGmailFolders } from "./gmailApiService"
+import {
+  decodeGmailBase64,
+  encodeGmailBase64,
+  buildRawRfc2822Email,
+  extractEmailBodies,
+  fetchAllGmailFolders,
+  sendGmailDraft,
+  sendGmailMessage,
+  saveGmailDraft,
+} from "./gmailApiService"
 
 describe("gmailApiService decoding and HTML extraction", () => {
   it("decodes URL-safe base64 string including UTF-8 characters", () => {
@@ -219,6 +228,142 @@ describe("gmailApiService decoding and HTML extraction", () => {
       expect(draftMsg?.isSent).toBeFalsy()
       expect(draftMsg?.senderName).toBe("You")
       expect(draftMsg?.recipientEmail).toBe("partner@example.com")
+      expect(draftMsg?.draftId).toBe("draft-xyz")
+      expect(draftMsg?.threadId).toBe("t-3")
+    })
+  })
+
+  describe("Sending and Drafting emails via Gmail API", () => {
+    const originalFetch = globalThis.fetch
+
+    beforeEach(() => {
+      vi.restoreAllMocks()
+    })
+
+    afterEach(() => {
+      globalThis.fetch = originalFetch
+    })
+
+    it("builds a valid RFC 2822 base64 email string", () => {
+      const encoded = encodeGmailBase64("Subject: Test\n\nHello")
+      expect(typeof encoded).toBe("string")
+
+      const raw = buildRawRfc2822Email({
+        to: "sarah@acme.com",
+        subject: "Meeting Confirmation",
+        body: "Confirmed for 10:00 AM",
+      })
+
+      expect(typeof raw).toBe("string")
+      const decoded = decodeGmailBase64(raw)
+      expect(decoded).toContain("To: sarah@acme.com")
+      expect(decoded).toContain("Subject:")
+      expect(decoded).toContain("Confirmed for 10:00 AM")
+    })
+
+    it("sends a message via Gmail messages.send endpoint", async () => {
+      let requestedUrl = ""
+      let requestedBody: any = null
+
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedBody = JSON.parse(options.body)
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: "sent-msg-123" }),
+        })
+      }) as any
+
+      const res = await sendGmailMessage({
+        to: "alex@studio.design",
+        subject: "Design Review",
+        body: "Looks good to me!",
+        accessToken: "test-token-123",
+      })
+
+      expect(res.success).toBe(true)
+      expect(res.id).toBe("sent-msg-123")
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/send")
+      expect(requestedBody.raw).toBeDefined()
+    })
+
+    it("sends an existing draft via Gmail drafts.send endpoint", async () => {
+      let requestedUrl = ""
+      let requestedBody: any = null
+
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedBody = JSON.parse(options.body)
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: "draft-sent-id" }),
+        })
+      }) as any
+
+      const res = await sendGmailDraft({
+        draftId: "r-987654321",
+        to: "client@example.com",
+        subject: "Final Deliverable",
+        body: "Attached is the final deliverable.",
+        accessToken: "test-token-123",
+      })
+
+      expect(res.success).toBe(true)
+      expect(res.id).toBe("draft-sent-id")
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/drafts/send")
+      expect(requestedBody.id).toBe("r-987654321")
+      expect(requestedBody.message?.raw).toBeDefined()
+    })
+
+    it("creates a draft via Gmail drafts endpoint", async () => {
+      let requestedUrl = ""
+
+      globalThis.fetch = vi.fn().mockImplementation((url: string) => {
+        requestedUrl = url
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ id: "created-draft-id", message: { id: "draft-msg-id" } }),
+        })
+      }) as any
+
+      const res = await saveGmailDraft({
+        to: "lead@example.com",
+        subject: "Draft Proposal",
+        body: "Drafting the scope of work...",
+        accessToken: "test-token-123",
+      })
+
+      expect(res.success).toBe(true)
+      expect(res.draftId).toBe("created-draft-id")
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/drafts")
+    })
+
+    it("handles 403 insufficient scopes error and returns GMAIL_INSUFFICIENT_SCOPES code", async () => {
+      globalThis.fetch = vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: false,
+          status: 403,
+          json: async () => ({
+            error: {
+              code: 403,
+              message: "Request had insufficient authentication scopes.",
+              status: "PERMISSION_DENIED",
+            },
+          }),
+        })
+      ) as any
+
+      const res = await sendGmailMessage({
+        to: "recipient@example.com",
+        subject: "Test",
+        body: "Test body",
+        accessToken: "old-token-readonly",
+      })
+
+      expect(res.success).toBe(false)
+      expect(res.code).toBe("GMAIL_INSUFFICIENT_SCOPES")
+      expect(res.status).toBe(403)
+      expect(res.error).toContain("Google account has not granted permission to send")
     })
   })
 })

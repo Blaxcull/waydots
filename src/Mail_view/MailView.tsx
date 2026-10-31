@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react"
 import {
   Inbox,
   Send,
@@ -40,6 +40,9 @@ import {
   connectGmailAccount,
   fetchAllGmailFolders,
   getGoogleProviderToken,
+  sendGmailDraft,
+  sendGmailMessage,
+  saveGmailDraft,
 } from "@/services/gmailApiService"
 import EmailHtmlViewer from "./EmailHtmlViewer"
 
@@ -65,6 +68,124 @@ function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
     </svg>
   )
 }
+
+interface ManualReplyFormProps {
+  emailId: string
+  senderAccount: string
+  isSending: boolean
+  onSend: (emailId: string, replyText: string) => Promise<void>
+}
+
+const ManualReplyForm = memo(function ManualReplyForm({
+  emailId,
+  senderAccount,
+  isSending,
+  onSend,
+}: ManualReplyFormProps) {
+  const [text, setText] = useState("")
+
+  useEffect(() => {
+    setText("")
+  }, [emailId])
+
+  const handleSend = async () => {
+    if (!text.trim() || isSending) return
+    const textToSend = text.trim()
+    await onSend(emailId, textToSend)
+    setText("")
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4">
+      <div className="text-xs font-semibold text-neutral-600 mb-2">Write a Reply</div>
+      <textarea
+        rows={3}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder={`Reply as ${senderAccount}...`}
+        className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans leading-relaxed"
+      />
+      <div className="mt-2.5 flex justify-end">
+        <Button
+          type="button"
+          onClick={handleSend}
+          disabled={!text.trim() || isSending}
+          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+        >
+          <Send className="mr-1.5 h-3.5 w-3.5" />
+          {isSending ? "Sending..." : "Send Reply"}
+        </Button>
+      </div>
+    </div>
+  )
+})
+
+interface DraftEditorFormProps {
+  email: Email
+  isSending: boolean
+  onSend: (draftId: string, text: string, recipient: string) => Promise<void>
+}
+
+const DraftEditorForm = memo(function DraftEditorForm({
+  email,
+  isSending,
+  onSend,
+}: DraftEditorFormProps) {
+  const [body, setBody] = useState(email.body)
+  const [recipient, setRecipient] = useState(email.recipientEmail || "")
+
+  useEffect(() => {
+    setBody(email.body)
+    setRecipient(email.recipientEmail || "")
+  }, [email.id, email.body, email.recipientEmail])
+
+  return (
+    <div className="mt-6 flex flex-col gap-3">
+      <div className="rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-neutral-600">
+            Draft Message Content (Edit before sending)
+          </div>
+          {email.draftId && (
+            <span className="text-[10px] font-mono text-neutral-500 bg-white/70 px-2 py-0.5 rounded-md border border-gray-200">
+              Gmail Draft
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-neutral-600 shrink-0">To:</span>
+          <input
+            type="email"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            placeholder="recipient@example.com"
+            className="flex-1 rounded-xl border border-gray-300/80 bg-white px-3 py-1.5 text-xs text-neutral-800 outline-none focus:border-neutral-500 font-sans"
+          />
+        </div>
+
+        <textarea
+          rows={4}
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="Draft content..."
+          className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans leading-relaxed"
+        />
+      </div>
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          disabled={isSending}
+          onClick={() => onSend(email.id, body, recipient)}
+          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
+          <span>{isSending ? "Sending Draft..." : "Send Draft"}</span>
+        </Button>
+      </div>
+    </div>
+  )
+})
 
 export default function MailView() {
   const {
@@ -101,10 +222,10 @@ export default function MailView() {
     toggleStarBatch,
   } = useEmailStore()
 
-  const [replyText, setReplyText] = useState("")
   const [draftEditText, setDraftEditText] = useState<string | null>(null)
+  const [isSending, setIsSending] = useState(false)
 
-  // Reset local draft text when switching selected emails
+  // Reset local AI draft text when switching selected emails
   useEffect(() => {
     setDraftEditText(null)
   }, [selectedEmailId])
@@ -175,39 +296,51 @@ export default function MailView() {
     return () => document.removeEventListener("mousedown", handleOutsideClick)
   }, [isSelectDropdownOpen])
 
-  // Filter emails by folder and search query
-  const folderEmails = emails.filter((email) => {
-    if (activeFolder === "starred" && !email.starred) return false
-    if (activeFolder === "draft" && !email.isDraft) return false
-    if (activeFolder === "sent" && !email.isSent) return false
-    if (activeFolder === "inbox" && (email.isDraft || email.isSent)) return false
+  // Filter emails by folder and search query (memoized to keep typing fast & lag-free)
+  const folderEmails = useMemo(() => {
+    return emails.filter((email) => {
+      if (activeFolder === "starred" && !email.starred) return false
+      if (activeFolder === "draft" && !email.isDraft) return false
+      if (activeFolder === "sent" && !email.isSent) return false
+      if (activeFolder === "inbox" && (email.isDraft || email.isSent)) return false
 
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase()
-      const matchSubject = email.subject.toLowerCase().includes(q)
-      const matchSender = email.senderName.toLowerCase().includes(q)
-      const matchBody = email.body.toLowerCase().includes(q)
-      return matchSubject || matchSender || matchBody
-    }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase()
+        const matchSubject = email.subject.toLowerCase().includes(q)
+        const matchSender = email.senderName.toLowerCase().includes(q)
+        const matchBody = email.body.toLowerCase().includes(q)
+        return matchSubject || matchSender || matchBody
+      }
 
-    return true
-  })
+      return true
+    })
+  }, [emails, activeFolder, searchQuery])
 
   // Priority counts within current folder
-  const highCount = folderEmails.filter((e) => e.priority === "high").length
-  const mediumCount = folderEmails.filter((e) => e.priority === "medium").length
-  const lowCount = folderEmails.filter((e) => e.priority === "low").length
+  const { highCount, mediumCount, lowCount } = useMemo(() => {
+    let high = 0
+    let medium = 0
+    let low = 0
+    for (const e of folderEmails) {
+      if (e.priority === "high") high++
+      else if (e.priority === "medium") medium++
+      else if (e.priority === "low") low++
+    }
+    return { highCount: high, mediumCount: medium, lowCount: low }
+  }, [folderEmails])
 
   // Filter by selected priority
-  const priorityFilteredEmails = folderEmails.filter((email) => {
-    if (priorityFilter === "all") return true
-    return email.priority === priorityFilter
-  })
+  const priorityFilteredEmails = useMemo(() => {
+    if (priorityFilter === "all") return folderEmails
+    return folderEmails.filter((email) => email.priority === priorityFilter)
+  }, [folderEmails, priorityFilter])
 
   // Order by priority if toggled or default
-  const displayedEmails = sortByPriority
-    ? sortEmailsByPriorityOrder(priorityFilteredEmails)
-    : priorityFilteredEmails
+  const displayedEmails = useMemo(() => {
+    return sortByPriority
+      ? sortEmailsByPriorityOrder(priorityFilteredEmails)
+      : priorityFilteredEmails
+  }, [priorityFilteredEmails, sortByPriority])
 
   const selectedEmail =
     selectedEmailId !== null ? emails.find((e) => e.id === selectedEmailId) || null : null
@@ -342,6 +475,26 @@ export default function MailView() {
     }
   }
 
+  const handleScopeErrorIfPresent = (result: { code?: string; error?: string }) => {
+    if (
+      result.code === "GMAIL_INSUFFICIENT_SCOPES" ||
+      result.error?.toLowerCase().includes("scope") ||
+      result.error?.toLowerCase().includes("insufficient")
+    ) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("google_provider_token")
+        localStorage.setItem("google_provider_token_rejected", "true")
+      }
+      setAuthModalActionUrl(null)
+      setAuthModalReason(
+        "Your current Google authorization only allows reading emails. To send emails and drafts from Waydots, Google requires your permission. Click 'Grant Access with Google' below to grant send and compose permissions."
+      )
+      setAuthModalOpen(true)
+      return true
+    }
+    return false
+  }
+
   const handleApproveDraft = async (email: Email) => {
     const finalContent =
       draftEditText !== null ? draftEditText : email.aiDraft?.suggestedReply || ""
@@ -350,28 +503,54 @@ export default function MailView() {
       return
     }
 
-    approveAiDraftAndSend(email.id, finalContent)
-
-    if (email.meetingInfo?.hasMeeting && email.aiDraft) {
-      const isRescheduled =
-        email.aiDraft.conflict?.resolved &&
-        email.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
-
-      await syncMeetingAndRescheduleToCalendar({
-        email,
-        slot: email.aiDraft.suggestedSlot,
-        taskTitle: email.aiDraft.suggestedTaskTitle,
-        conflictingTitle: email.aiDraft.conflict?.conflictingTitle,
-        rescheduledToTime: isRescheduled
-          ? { start: 14 * 60, end: 15 * 60, label: "2:00 PM - 3:00 PM" }
-          : undefined,
+    setIsSending(true)
+    try {
+      const result = await sendGmailMessage({
+        to: email.senderEmail,
+        subject: email.subject.startsWith("Re:") ? email.subject : `Re: ${email.subject}`,
+        body: finalContent,
+        threadId: email.threadId,
+        senderAccount,
       })
-      triggerToast("Draft sent! Meeting scheduled & synced with Calendar.")
-    } else {
-      triggerToast("Draft sent successfully! Copy added to Sent folder.")
-    }
 
-    setDraftEditText(null)
+      if (!result.success && result.error) {
+        if (handleScopeErrorIfPresent(result)) {
+          triggerToast("Additional Google permission required to send emails.")
+          return
+        }
+        triggerToast(`Failed to send draft: ${result.error}`)
+        return
+      }
+
+      approveAiDraftAndSend(email.id, finalContent)
+
+      if (email.meetingInfo?.hasMeeting && email.aiDraft) {
+        const isRescheduled =
+          email.aiDraft.conflict?.resolved &&
+          email.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
+
+        await syncMeetingAndRescheduleToCalendar({
+          email,
+          slot: email.aiDraft.suggestedSlot,
+          taskTitle: email.aiDraft.suggestedTaskTitle,
+          conflictingTitle: email.aiDraft.conflict?.conflictingTitle,
+          rescheduledToTime: isRescheduled
+            ? { start: 14 * 60, end: 15 * 60, label: "2:00 PM - 3:00 PM" }
+            : undefined,
+        })
+        triggerToast("Draft sent! Meeting scheduled & synced with Calendar.")
+      } else {
+        triggerToast("Draft sent successfully! Copy added to Sent folder.")
+      }
+
+      setDraftEditText(null)
+    } catch (err: any) {
+      if (!handleScopeErrorIfPresent({ error: err?.message })) {
+        triggerToast(`Error sending draft: ${err?.message || "Unknown error"}`)
+      }
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleResolveConflictWithAlternative = (email: Email) => {
@@ -623,55 +802,182 @@ export default function MailView() {
     return () => window.removeEventListener("focus", handleFocus)
   }, [syncGmailAutomatically])
 
-  const handleSendManualReply = (emailId: string) => {
-    if (!replyText.trim()) return
-    sendReply(emailId, replyText.trim())
-    setReplyText("")
-    triggerToast("Reply sent successfully!")
-  }
+  const handleSendManualReply = useCallback(
+    async (emailId: string, replyText: string) => {
+      if (!replyText.trim()) return
+      const targetEmail = emails.find((e) => e.id === emailId)
+      if (!targetEmail) return
 
-  const handleSendDraft = (draftId: string) => {
-    const textToSend = draftEditText !== null ? draftEditText : undefined
-    sendDraft(draftId, textToSend)
-    setDraftEditText(null)
-    setActiveFolder("sent")
-    triggerToast("Draft sent successfully! Moved to Sent folder.")
-  }
+      setIsSending(true)
+      try {
+        const result = await sendGmailMessage({
+          to: targetEmail.senderEmail,
+          subject: targetEmail.subject.startsWith("Re:") ? targetEmail.subject : `Re: ${targetEmail.subject}`,
+          body: replyText.trim(),
+          threadId: targetEmail.threadId,
+          senderAccount,
+        })
 
-  const handleSendCompose = () => {
+        if (!result.success && result.error) {
+          if (handleScopeErrorIfPresent(result)) {
+            triggerToast("Additional Google permission required to send.")
+            return
+          }
+          triggerToast(`Failed to send reply: ${result.error}`)
+          return
+        }
+
+        sendReply(emailId, replyText.trim())
+        triggerToast("Reply sent successfully!")
+      } catch (err: any) {
+        if (!handleScopeErrorIfPresent({ error: err?.message })) {
+          triggerToast(`Error sending reply: ${err?.message || "Unknown error"}`)
+        }
+      } finally {
+        setIsSending(false)
+      }
+    },
+    [emails, senderAccount, sendReply]
+  )
+
+  const handleSendDraft = useCallback(
+    async (draftId: string, textToSend: string, recipientToSend: string) => {
+      const email = emails.find((e) => e.id === draftId)
+      if (!email) return
+
+      setIsSending(true)
+      try {
+        const result = await sendGmailDraft({
+          draftId: email.draftId,
+          to: recipientToSend || "recipient@example.com",
+          subject: email.subject,
+          body: textToSend,
+          threadId: email.threadId,
+        })
+
+        if (!result.success && result.error) {
+          if (handleScopeErrorIfPresent(result)) {
+            triggerToast("Additional Google permission required to send drafts.")
+            return
+          }
+          triggerToast(`Failed to send draft: ${result.error}`)
+          return
+        }
+
+        sendDraft(draftId, textToSend, recipientToSend)
+        setActiveFolder("sent")
+        triggerToast("Draft sent successfully! Moved to Sent folder.")
+      } catch (err: any) {
+        if (!handleScopeErrorIfPresent({ error: err?.message })) {
+          triggerToast(`Error sending draft: ${err?.message || "Unknown error"}`)
+        }
+      } finally {
+        setIsSending(false)
+      }
+    },
+    [emails, sendDraft, setActiveFolder]
+  )
+
+  const handleSendCompose = async () => {
     if (!composeTo.trim() && !composeSubject.trim() && !composeBody.trim()) {
       setIsComposeOpen(false)
       return
     }
-    composeEmail({
-      recipientEmail: composeTo.trim() || "recipient@example.com",
-      subject: composeSubject.trim() || "(No Subject)",
-      body: composeBody.trim(),
-      priority: composePriority,
-      isDraft: false,
-    })
-    setComposeTo("")
-    setComposeSubject("")
-    setComposeBody("")
-    setComposePriority("medium")
-    setIsComposeOpen(false)
-    triggerToast("Email sent successfully!")
+
+    const to = composeTo.trim() || "recipient@example.com"
+    const subject = composeSubject.trim() || "(No Subject)"
+    const body = composeBody.trim()
+
+    setIsSending(true)
+    try {
+      const result = await sendGmailMessage({
+        to,
+        subject,
+        body,
+        senderAccount,
+      })
+
+      if (!result.success && result.error) {
+        if (handleScopeErrorIfPresent(result)) {
+          triggerToast("Additional Google permission required to send emails.")
+          return
+        }
+        triggerToast(`Failed to send email: ${result.error}`)
+        return
+      }
+
+      composeEmail({
+        recipientEmail: to,
+        subject,
+        body,
+        priority: composePriority,
+        isDraft: false,
+      })
+      setComposeTo("")
+      setComposeSubject("")
+      setComposeBody("")
+      setComposePriority("medium")
+      setIsComposeOpen(false)
+      triggerToast("Email sent successfully!")
+    } catch (err: any) {
+      if (!handleScopeErrorIfPresent({ error: err?.message })) {
+        triggerToast(`Error sending email: ${err?.message || "Unknown error"}`)
+      }
+    } finally {
+      setIsSending(false)
+    }
   }
 
-  const handleSaveDraftCompose = () => {
-    composeEmail({
-      recipientEmail: composeTo.trim() || "draft@example.com",
-      subject: composeSubject.trim() || "(Untitled Draft)",
-      body: composeBody.trim(),
-      priority: composePriority,
-      isDraft: true,
-    })
-    setComposeTo("")
-    setComposeSubject("")
-    setComposeBody("")
-    setComposePriority("medium")
-    setIsComposeOpen(false)
-    triggerToast("Draft saved to Draft folder!")
+  const handleSaveDraftCompose = async () => {
+    const to = composeTo.trim() || "draft@example.com"
+    const subject = composeSubject.trim() || "(Untitled Draft)"
+    const body = composeBody.trim()
+
+    try {
+      const result = await saveGmailDraft({
+        to,
+        subject,
+        body,
+      })
+
+      if (!result.success && result.error) {
+        handleScopeErrorIfPresent(result)
+      }
+
+      composeEmail({
+        recipientEmail: to,
+        subject,
+        body,
+        priority: composePriority,
+        isDraft: true,
+        draftId: result.draftId,
+      })
+      setComposeTo("")
+      setComposeSubject("")
+      setComposeBody("")
+      setComposePriority("medium")
+      setIsComposeOpen(false)
+      if (result.success && result.draftId) {
+        triggerToast("Draft saved and synced to Gmail!")
+      } else {
+        triggerToast("Draft saved to Draft folder!")
+      }
+    } catch (err: any) {
+      handleScopeErrorIfPresent({ error: err?.message })
+      composeEmail({
+        recipientEmail: to,
+        subject,
+        body,
+        priority: composePriority,
+        isDraft: true,
+      })
+      setComposeTo("")
+      setComposeSubject("")
+      setComposeBody("")
+      setComposePriority("medium")
+      setIsComposeOpen(false)
+      triggerToast("Draft saved to Draft folder!")
+    }
   }
 
   const folderTitle =
@@ -841,11 +1147,12 @@ export default function MailView() {
                 </Button>
                 <Button
                   type="button"
+                  disabled={isSending}
                   onClick={handleSendCompose}
-                  className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center"
+                  className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center disabled:opacity-50"
                 >
-                  <Send className="mr-1.5 h-3.5 w-3.5" />
-                  Send Message
+                  <Send className={`mr-1.5 h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
+                  {isSending ? "Sending..." : "Send Message"}
                 </Button>
               </div>
             </div>
@@ -1487,14 +1794,16 @@ export default function MailView() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-sm text-neutral-700 shadow-inner shrink-0">
-                        {selectedEmail.senderName.charAt(0)}
+                        {selectedEmail.isDraft ? "D" : selectedEmail.senderName.charAt(0)}
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold text-neutral-900 truncate">
-                          {selectedEmail.senderName}
+                          {selectedEmail.isDraft ? "Draft" : selectedEmail.senderName}
                         </div>
                         <div className="text-xs text-neutral-500 truncate">
-                          {selectedEmail.senderEmail}
+                          {selectedEmail.isDraft
+                            ? `To: ${selectedEmail.recipientEmail || "(No recipient)"}`
+                            : selectedEmail.senderEmail}
                         </div>
                       </div>
                     </div>
@@ -1769,12 +2078,15 @@ export default function MailView() {
                         </Button>
                         <Button
                           type="button"
+                          disabled={isSending}
                           onClick={() => handleApproveDraft(selectedEmail)}
-                          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                         >
-                          <Send className="h-3.5 w-3.5" />
+                          <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
                           <span>
-                            {selectedEmail.meetingInfo?.hasMeeting
+                            {isSending
+                              ? "Sending..."
+                              : selectedEmail.meetingInfo?.hasMeeting
                               ? "Send & Sync to Calendar"
                               : "Send Draft"}
                           </span>
@@ -1784,61 +2096,28 @@ export default function MailView() {
                   </div>
                 )}
 
-                {/* Email Content Body (Rich HTML or Typographic Text) */}
-                <EmailHtmlViewer
-                  html={selectedEmail.htmlBody}
-                  plainText={selectedEmail.body}
-                />
+                {/* Email Content Body (Rich HTML or Typographic Text, hidden for drafts to maximize typing responsiveness) */}
+                {!selectedEmail.isDraft && (
+                  <EmailHtmlViewer
+                    html={selectedEmail.htmlBody}
+                    plainText={selectedEmail.body}
+                  />
+                )}
 
                 {/* If Selected Email is a Draft: Show Send Draft Action & Editable Box */}
                 {selectedEmail.isDraft ? (
-                  <div className="mt-6 flex flex-col gap-3">
-                    <div className="rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4">
-                      <div className="text-xs font-semibold text-neutral-600 mb-2">
-                        Draft Message Content (Edit before sending)
-                      </div>
-                      <textarea
-                        rows={4}
-                        value={draftEditText !== null ? draftEditText : selectedEmail.body}
-                        onChange={(e) => setDraftEditText(e.target.value)}
-                        placeholder="Draft content..."
-                        className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans"
-                      />
-                    </div>
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        onClick={() => handleSendDraft(selectedEmail.id)}
-                        className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        <span>Send Draft</span>
-                      </Button>
-                    </div>
-                  </div>
+                  <DraftEditorForm
+                    email={selectedEmail}
+                    isSending={isSending}
+                    onSend={handleSendDraft}
+                  />
                 ) : (
-                  /* Manual Reply Form */
-                  <div className="mt-6 rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4">
-                    <div className="text-xs font-semibold text-neutral-600 mb-2">Write a Reply</div>
-                    <textarea
-                      rows={3}
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      placeholder={`Reply as ${senderAccount}...`}
-                      className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400"
-                    />
-                    <div className="mt-2.5 flex justify-end">
-                      <Button
-                        type="button"
-                        onClick={() => handleSendManualReply(selectedEmail.id)}
-                        disabled={!replyText.trim()}
-                        className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
-                      >
-                        <Send className="mr-1.5 h-3.5 w-3.5" />
-                        Send Reply
-                      </Button>
-                    </div>
-                  </div>
+                  <ManualReplyForm
+                    emailId={selectedEmail.id}
+                    senderAccount={senderAccount}
+                    isSending={isSending}
+                    onSend={handleSendManualReply}
+                  />
                 )}
               </div>
             </div>

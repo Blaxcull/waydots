@@ -46,6 +46,8 @@ export interface Email {
   starred?: boolean
   isDraft?: boolean
   isSent?: boolean
+  draftId?: string
+  threadId?: string
   aiDraft?: EmailDraft
   linkedTaskId?: string
   meetingInfo?: MeetingInfo
@@ -246,7 +248,7 @@ interface EmailStoreState {
   updateEmailDraft: (id: string, updates: Partial<EmailDraft>) => void
   resolveDraftConflict: (id: string, resolution: "alternative" | "reschedule") => void
   sendReply: (emailId: string, replyText: string) => void
-  sendDraft: (draftId: string, updatedBody?: string) => void
+  sendDraft: (draftId: string, updatedBody?: string, updatedRecipient?: string) => void
   deleteEmail: (id: string) => void
   restoreDeletedEmails: (emails: Email[]) => void
   markBatchAsRead: (ids: string[]) => void
@@ -259,6 +261,8 @@ interface EmailStoreState {
     body: string
     priority: EmailPriority
     isDraft?: boolean
+    draftId?: string
+    threadId?: string
   }) => void
 }
 
@@ -467,13 +471,14 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
       }
     }),
 
-  sendDraft: (draftId, updatedBody) =>
+  sendDraft: (draftId, updatedBody, updatedRecipient) =>
     set((state) => ({
       emails: state.emails.map((e) =>
         e.id === draftId
           ? {
               ...e,
               body: updatedBody !== undefined ? updatedBody : e.body,
+              recipientEmail: updatedRecipient !== undefined ? updatedRecipient : e.recipientEmail,
               isDraft: false,
               isSent: true,
               timestamp: "Just now",
@@ -523,7 +528,15 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
       }),
     })),
 
-  composeEmail: ({ subject, recipientEmail, body, priority, isDraft = false }) =>
+  composeEmail: ({
+    subject,
+    recipientEmail,
+    body,
+    priority,
+    isDraft = false,
+    draftId,
+    threadId,
+  }) =>
     set((state) => {
       const newEmail: Email = {
         id: `email-${Date.now()}`,
@@ -538,6 +551,8 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         isDraft,
         isSent: !isDraft,
         priority,
+        draftId,
+        threadId,
       }
       return {
         emails: [newEmail, ...state.emails],

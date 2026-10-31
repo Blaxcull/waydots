@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
 
 interface EmailHtmlViewerProps {
   html?: string
@@ -6,7 +6,7 @@ interface EmailHtmlViewerProps {
   className?: string
 }
 
-export default function EmailHtmlViewer({
+function EmailHtmlViewerComponent({
   html,
   plainText = "",
   className = "",
@@ -24,6 +24,12 @@ export default function EmailHtmlViewer({
   // Construct isolated, responsive, and sandboxed HTML document
   const safeDoc = useMemo(() => {
     if (!rawHtml) return ""
+
+    // Strip all executable scripts and inline event handlers to prevent sandbox blocked execution warnings
+    const sanitizedHtml = rawHtml
+      .replace(/<script\b[\s\S]*?<\/script>/gi, "")
+      .replace(/\s(on\w+)\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "")
+      .replace(/href\s*=\s*["']?javascript:[^"'>]*/gi, "")
 
     const baseTag = '<base target="_blank">'
     const responsiveStyle = `
@@ -46,12 +52,18 @@ export default function EmailHtmlViewer({
           padding: 14px 10px;
         }
         img {
-          max-width: 100% !important;
-          height: auto !important;
+          max-width: 100%;
+        }
+        img[width="1"][height="1"], img[width="0"][height="0"] {
+          display: none !important;
         }
         table {
-          max-width: 100% !important;
-          width: auto !important;
+          max-width: 100%;
+        }
+        hr {
+          border: 0;
+          border-top: 1px solid #e5e7eb;
+          margin: 12px 0;
         }
         a {
           color: #2563eb;
@@ -60,14 +72,14 @@ export default function EmailHtmlViewer({
       </style>
     `
 
-    if (rawHtml.toLowerCase().includes("<html")) {
-      if (rawHtml.toLowerCase().includes("<head>")) {
-        return rawHtml.replace(/<head>/i, `<head>${baseTag}${responsiveStyle}`)
+    if (sanitizedHtml.toLowerCase().includes("<html")) {
+      if (sanitizedHtml.toLowerCase().includes("<head>")) {
+        return sanitizedHtml.replace(/<head>/i, `<head>${baseTag}${responsiveStyle}`)
       }
-      return rawHtml.replace(/<html[^>]*>/i, `$&<head>${baseTag}${responsiveStyle}</head>`)
+      return sanitizedHtml.replace(/<html[^>]*>/i, `$&<head>${baseTag}${responsiveStyle}</head>`)
     }
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/>${baseTag}${responsiveStyle}</head><body>${rawHtml}</body></html>`
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/>${baseTag}${responsiveStyle}</head><body>${sanitizedHtml}</body></html>`
   }, [rawHtml])
 
   const updateHeight = useCallback(() => {
@@ -80,7 +92,7 @@ export default function EmailHtmlViewer({
         const htmlHeight = doc.documentElement?.scrollHeight || 0
         const computed = Math.max(bodyHeight, htmlHeight)
         if (computed > 30) {
-          setIframeHeight(computed + 20)
+          setIframeHeight((prev) => (Math.abs(prev - (computed + 20)) > 10 ? computed + 20 : prev))
         }
       }
     } catch {
@@ -107,15 +119,13 @@ export default function EmailHtmlViewer({
       // Ignore
     }
 
-    const t1 = setTimeout(updateHeight, 300)
-    const t2 = setTimeout(updateHeight, 1000)
-    const t3 = setTimeout(updateHeight, 2400)
+    const t1 = setTimeout(updateHeight, 350)
+    const t2 = setTimeout(updateHeight, 1200)
 
     return () => {
       ro?.disconnect()
       clearTimeout(t1)
       clearTimeout(t2)
-      clearTimeout(t3)
     }
   }, [safeDoc, isHtml, updateHeight])
 
@@ -143,3 +153,6 @@ export default function EmailHtmlViewer({
     </div>
   )
 }
+
+const EmailHtmlViewer = memo(EmailHtmlViewerComponent)
+export default EmailHtmlViewer

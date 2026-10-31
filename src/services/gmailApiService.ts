@@ -3,7 +3,7 @@ import type { Email } from "@/store/emailStore"
 import { classifyEmailsWithKeywords } from "@/services/geminiMailService"
 
 /**
- * Initiates Google OAuth with Gmail Read-Only permission via Supabase.
+ * Initiates Google OAuth with Gmail Read, Send, and Compose/Draft permissions via Supabase.
  */
 export async function connectGmailAccount(): Promise<{ error?: string }> {
   try {
@@ -12,15 +12,17 @@ export async function connectGmailAccount(): Promise<{ error?: string }> {
       localStorage.removeItem("google_provider_token_rejected")
     }
     const origin = window.location.origin
+    const scopes =
+      "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose"
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        scopes: "openid email profile https://www.googleapis.com/auth/gmail.readonly",
+        scopes,
         redirectTo: `${origin}/mail`,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
-          scope: "openid email profile https://www.googleapis.com/auth/gmail.readonly",
+          scope: scopes,
         },
       },
     })
@@ -194,6 +196,353 @@ async function fetchGmailJson<T>(url: string, accessToken: string): Promise<T | 
     return (await res.json()) as T
   } catch {
     return null
+  }
+}
+
+/**
+ * Base64 encodes a UTF-8 string safely in browser/node environments.
+ */
+export function encodeBase64Utf8(str: string): string {
+  const bytes = new TextEncoder().encode(str)
+  let binary = ""
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
+}
+
+/**
+ * Encodes a UTF-8 string to URL-safe Base64 as required by the Gmail API.
+ */
+export function encodeGmailBase64(str: string): string {
+  return encodeBase64Utf8(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+}
+
+/**
+ * Constructs an RFC 2822 formatted raw message and encodes it as URL-safe base64.
+ */
+export function buildRawRfc2822Email(params: {
+  to: string
+  from?: string
+  subject: string
+  body: string
+  threadId?: string
+  inReplyTo?: string
+  references?: string
+}): string {
+  const lines: string[] = []
+  if (params.to) {
+    lines.push(`To: ${params.to}`)
+  }
+  if (params.from) {
+    lines.push(`From: ${params.from}`)
+  }
+  const encodedSubject = `=?utf-8?B?${encodeBase64Utf8(params.subject || "")}?=`
+  lines.push(`Subject: ${encodedSubject}`)
+  lines.push("Content-Type: text/plain; charset=utf-8")
+  lines.push("MIME-Version: 1.0")
+  if (params.inReplyTo) {
+    lines.push(`In-Reply-To: ${params.inReplyTo}`)
+  }
+  if (params.references) {
+    lines.push(`References: ${params.references}`)
+  }
+  lines.push("")
+  lines.push(params.body || "")
+
+  return encodeGmailBase64(lines.join("\r\n"))
+}
+
+/**
+ * Sends a message via the Gmail REST API (users.messages.send).
+ */
+export async function sendGmailMessage(params: {
+  to: string
+  subject: string
+  body: string
+  threadId?: string
+  senderAccount?: string
+  accessToken?: string
+}): Promise<{ success: boolean; id?: string; error?: string; code?: string; status?: number }> {
+  const token = params.accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    // Mock / offline fallback: store will handle updating local state
+    return { success: true }
+  }
+
+  try {
+    const raw = buildRawRfc2822Email({
+      to: params.to,
+      from: params.senderAccount,
+      subject: params.subject,
+      body: params.body,
+      threadId: params.threadId,
+    })
+
+    const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        raw,
+        ...(params.threadId ? { threadId: params.threadId } : {}),
+      }),
+    })
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null)
+      const errorMsg = errJson?.error?.message || `Failed to send email (${res.status})`
+      const isInsufficientScopes =
+        res.status === 403 ||
+        errorMsg.toLowerCase().includes("scope") ||
+        errorMsg.toLowerCase().includes("insufficient")
+
+      if (isInsufficientScopes) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("google_provider_token")
+          localStorage.setItem("google_provider_token_rejected", "true")
+        }
+        return {
+          success: false,
+          code: "GMAIL_INSUFFICIENT_SCOPES",
+          status: 403,
+          error:
+            "Your Google account has not granted permission to send emails. Please re-authorize Google to grant send access.",
+        }
+      }
+
+      return {
+        success: false,
+        error: errorMsg,
+      }
+    }
+
+    const json = await res.json()
+    return { success: true, id: json.id }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to send email" }
+  }
+}
+
+/**
+ * Sends a draft email via Gmail API (users.drafts.send) or falls back to messages.send.
+ */
+export async function sendGmailDraft(params: {
+  draftId?: string
+  to?: string
+  subject?: string
+  body: string
+  threadId?: string
+  accessToken?: string
+}): Promise<{ success: boolean; id?: string; error?: string; code?: string; status?: number }> {
+  const token = params.accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    return { success: true }
+  }
+
+  try {
+    // If draftId is an actual Gmail draft identifier
+    if (params.draftId && !params.draftId.startsWith("email-draft-")) {
+      const raw = buildRawRfc2822Email({
+        to: params.to || "recipient@example.com",
+        subject: params.subject || "(No Subject)",
+        body: params.body,
+        threadId: params.threadId,
+      })
+
+      const sendDraftRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts/send", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: params.draftId,
+          message: {
+            raw,
+            ...(params.threadId ? { threadId: params.threadId } : {}),
+          },
+        }),
+      })
+
+      if (sendDraftRes.ok) {
+        const json = await sendDraftRes.json()
+        return { success: true, id: json.id }
+      }
+
+      const errJson = await sendDraftRes.json().catch(() => null)
+      const errorMsg = errJson?.error?.message || `Failed to send draft (${sendDraftRes.status})`
+      const isInsufficientScopes =
+        sendDraftRes.status === 403 ||
+        errorMsg.toLowerCase().includes("scope") ||
+        errorMsg.toLowerCase().includes("insufficient")
+
+      if (isInsufficientScopes) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("google_provider_token")
+          localStorage.setItem("google_provider_token_rejected", "true")
+        }
+        return {
+          success: false,
+          code: "GMAIL_INSUFFICIENT_SCOPES",
+          status: 403,
+          error:
+            "Your Google account has not granted permission to send drafts. Please re-authorize Google to grant send access.",
+        }
+      }
+
+      // If draft was not found (404), fall back to sending as standard message
+      if (sendDraftRes.status !== 404) {
+        return {
+          success: false,
+          error: errorMsg,
+        }
+      }
+    }
+
+    // Fallback: send as standard message
+    return await sendGmailMessage({
+      to: params.to || "recipient@example.com",
+      subject: params.subject || "(No Subject)",
+      body: params.body,
+      threadId: params.threadId,
+      accessToken: token,
+    })
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Error sending draft" }
+  }
+}
+
+/**
+ * Saves or updates a draft in Gmail via users.drafts.create or users.drafts.update.
+ */
+export async function saveGmailDraft(params: {
+  draftId?: string
+  to: string
+  subject: string
+  body: string
+  threadId?: string
+  accessToken?: string
+}): Promise<{
+  success: boolean
+  draftId?: string
+  id?: string
+  error?: string
+  code?: string
+  status?: number
+}> {
+  const token = params.accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    return { success: true }
+  }
+
+  try {
+    const raw = buildRawRfc2822Email({
+      to: params.to,
+      subject: params.subject,
+      body: params.body,
+      threadId: params.threadId,
+    })
+
+    if (params.draftId && !params.draftId.startsWith("email-draft-")) {
+      const res = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${encodeURIComponent(params.draftId)}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            id: params.draftId,
+            message: {
+              raw,
+              ...(params.threadId ? { threadId: params.threadId } : {}),
+            },
+          }),
+        }
+      )
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null)
+        const errorMsg = errJson?.error?.message || `Failed to update draft (${res.status})`
+        const isInsufficientScopes =
+          res.status === 403 ||
+          errorMsg.toLowerCase().includes("scope") ||
+          errorMsg.toLowerCase().includes("insufficient")
+
+        if (isInsufficientScopes) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("google_provider_token")
+            localStorage.setItem("google_provider_token_rejected", "true")
+          }
+          return {
+            success: false,
+            code: "GMAIL_INSUFFICIENT_SCOPES",
+            status: 403,
+            error:
+              "Your Google account has not granted permission to manage drafts. Please re-authorize Google to grant compose access.",
+          }
+        }
+
+        return {
+          success: false,
+          error: errorMsg,
+        }
+      }
+
+      const json = await res.json()
+      return { success: true, draftId: json.id, id: json.message?.id }
+    } else {
+      const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          message: {
+            raw,
+            ...(params.threadId ? { threadId: params.threadId } : {}),
+          },
+        }),
+      })
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null)
+        const errorMsg = errJson?.error?.message || `Failed to create draft (${res.status})`
+        const isInsufficientScopes =
+          res.status === 403 ||
+          errorMsg.toLowerCase().includes("scope") ||
+          errorMsg.toLowerCase().includes("insufficient")
+
+        if (isInsufficientScopes) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("google_provider_token")
+            localStorage.setItem("google_provider_token_rejected", "true")
+          }
+          return {
+            success: false,
+            code: "GMAIL_INSUFFICIENT_SCOPES",
+            status: 403,
+            error:
+              "Your Google account has not granted permission to manage drafts. Please re-authorize Google to grant compose access.",
+          }
+        }
+
+        return {
+          success: false,
+          error: errorMsg,
+        }
+      }
+
+      const json = await res.json()
+      return { success: true, draftId: json.id, id: json.message?.id }
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to save draft" }
   }
 }
 
@@ -450,6 +799,8 @@ export async function fetchAllGmailFolders(
           isDraft: isDraft || undefined,
           isSent: isSent || undefined,
           priority: "medium",
+          draftId: meta.draftId,
+          threadId: msg.threadId || meta.threadId,
         }
 
         return emailObj
