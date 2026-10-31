@@ -38,7 +38,7 @@ import {
 } from "@/services/geminiMailService"
 import {
   connectGmailAccount,
-  fetchTop20GmailMessages,
+  fetchAllGmailFolders,
   getGoogleProviderToken,
 } from "@/services/gmailApiService"
 import EmailHtmlViewer from "./EmailHtmlViewer"
@@ -501,32 +501,53 @@ export default function MailView() {
     }
   }
 
-  // Automatically fetch & sync the latest Gmail emails for the logged-in mail id
+  // Automatically fetch & sync all Gmail data across Inbox, Starred, Drafts, and Sent
   const syncGmailAutomatically = useCallback(async (isSilent = true) => {
     try {
       const token = await getGoogleProviderToken()
       if (!token) {
         if (!isSilent) {
-          setAuthModalReason("Your Google account is signed in, but reading Gmail messages has not been authorized yet. Click below to grant Gmail access.")
+          setAuthModalReason(
+            "To sync all your mail across Inbox, Starred, Drafts, and Sent, please connect your Google account with Gmail access."
+          )
           setAuthModalOpen(true)
         }
         return
       }
 
       setIsGmailSyncing(true)
-      const liveEmails = await fetchTop20GmailMessages(token, loggedInEmail || undefined)
+      const liveEmails = await fetchAllGmailFolders(token, loggedInEmail || undefined)
       if (liveEmails.length > 0) {
-        setEmails(liveEmails)
-      }
-      if (typeof window !== "undefined") {
-        const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
-        localStorage.setItem(cacheKey, JSON.stringify(liveEmails))
-        if (window.location.hash.includes("access_token") || window.location.hash.includes("provider_token")) {
-          window.history.replaceState({}, document.title, window.location.pathname)
+        // Merge with existing local drafts/sent that aren't on Gmail yet
+        const currentEmails = useEmailStore.getState().emails
+        const liveIds = new Set(liveEmails.map((e) => e.id))
+        const localDraftsAndSent = currentEmails.filter(
+          (e) => !liveIds.has(e.id) && (e.isDraft || e.isSent) && e.id.startsWith("email-")
+        )
+        const allSynced = [...liveEmails, ...localDraftsAndSent]
+        setEmails(allSynced)
+
+        if (typeof window !== "undefined") {
+          const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+          localStorage.setItem(cacheKey, JSON.stringify(allSynced))
+          if (window.location.hash.includes("access_token") || window.location.hash.includes("provider_token")) {
+            window.history.replaceState({}, document.title, window.location.pathname)
+          }
         }
-      }
-      if (!isSilent) {
-        triggerToast(`Synced ${liveEmails.length} emails from Gmail`)
+
+        if (!isSilent) {
+          const inboxCount = allSynced.filter((e) => !e.isDraft && !e.isSent).length
+          const starredCount = allSynced.filter((e) => e.starred).length
+          const draftCount = allSynced.filter((e) => e.isDraft).length
+          const sentCount = allSynced.filter((e) => e.isSent).length
+          triggerToast(
+            `All mail synced: ${inboxCount} inbox, ${starredCount} starred, ${draftCount} drafts, ${sentCount} sent`
+          )
+        }
+      } else {
+        if (!isSilent) {
+          triggerToast("All mail synced: No emails found in Gmail mailbox.")
+        }
       }
     } catch (err: any) {
       if (
@@ -903,13 +924,13 @@ export default function MailView() {
                   <span>Priority Wise</span>
                 </button>
 
-                {/* Sync Gmail Button */}
+                {/* Sync All Mail Button */}
                 <button
                   type="button"
                   onClick={() => syncGmailAutomatically(false)}
                   disabled={isGmailSyncing || isGmailAuthorizing}
-                  title="Sync latest emails from Gmail"
-                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer ${
+                  title="One-click sync for Inbox, Starred, Drafts & Sent"
+                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 ${
                     isGmailSyncing
                       ? "border-blue-400 bg-blue-50 text-blue-700 shadow-xs"
                       : "border-gray-300/80 bg-[#e7e7e6] text-neutral-700 hover:bg-[#dddddc] hover:text-neutral-900"
@@ -918,7 +939,7 @@ export default function MailView() {
                   {isGmailSyncing ? (
                     <>
                       <span className="h-3 w-3 border-2 border-blue-600/40 border-t-blue-600 rounded-full animate-spin" />
-                      <span>Syncing...</span>
+                      <span>Syncing All...</span>
                     </>
                   ) : isGmailAuthorizing ? (
                     <>
@@ -928,7 +949,7 @@ export default function MailView() {
                   ) : (
                     <>
                       <GoogleIcon className="h-3.5 w-3.5" />
-                      <span>Sync Gmail</span>
+                      <span>Sync All Mail</span>
                     </>
                   )}
                 </button>
@@ -1116,10 +1137,10 @@ export default function MailView() {
                       <GoogleIcon className="h-3.5 w-3.5" />
                       <span>
                         {isGmailSyncing
-                          ? "Syncing..."
+                          ? "Syncing All..."
                           : isGmailAuthorizing
                           ? "Connecting..."
-                          : "Sync Gmail"}
+                          : "Sync All Mail"}
                       </span>
                     </button>
                   </div>
@@ -1987,7 +2008,7 @@ export default function MailView() {
 
             <p className="text-xs leading-relaxed text-neutral-600">
               {authModalReason ||
-                "To read and sync your emails, Google requires your permission to access your Gmail inbox. Please click below to grant access."}
+                "To read and sync all your mail across Inbox, Starred, Drafts, and Sent, Google requires your permission to access your Gmail. Please click below to grant access."}
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
