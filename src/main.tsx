@@ -12,7 +12,6 @@ if (typeof window !== 'undefined') {
     const searchParams = new URLSearchParams(window.location.search)
     const providerToken = hashParams.get('provider_token') || searchParams.get('provider_token')
     if (providerToken) {
-      localStorage.removeItem('google_provider_token_rejected')
       localStorage.setItem('google_provider_token', providerToken)
     }
   } catch {

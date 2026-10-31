@@ -13,10 +13,6 @@ export const GOOGLE_OAUTH_SCOPES =
  */
 export async function connectGmailAccount(): Promise<{ error?: string }> {
   try {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("google_provider_token")
-      localStorage.removeItem("google_provider_token_rejected")
-    }
     const origin = window.location.origin
     const scopes = GOOGLE_OAUTH_SCOPES
     const { error } = await supabase.auth.signInWithOAuth({
@@ -52,7 +48,6 @@ export async function getGoogleProviderToken(): Promise<string | null> {
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""))
       const hashProviderToken = hashParams.get("provider_token")
       if (hashProviderToken) {
-        localStorage.removeItem("google_provider_token_rejected")
         localStorage.setItem("google_provider_token", hashProviderToken)
         return hashProviderToken
       }
@@ -63,15 +58,9 @@ export async function getGoogleProviderToken(): Promise<string | null> {
       const searchParams = new URLSearchParams(window.location.search)
       const queryProviderToken = searchParams.get("provider_token")
       if (queryProviderToken) {
-        localStorage.removeItem("google_provider_token_rejected")
         localStorage.setItem("google_provider_token", queryProviderToken)
         return queryProviderToken
       }
-    }
-
-    // If the token was previously rejected for 403 / insufficient scopes, do not reuse it
-    if (localStorage.getItem("google_provider_token_rejected") === "true") {
-      return null
     }
 
     // 3. Check dedicated localStorage cache
@@ -393,16 +382,12 @@ export async function sendGmailMessage(params: {
         errorMsg.toLowerCase().includes("insufficient")
 
       if (isInsufficientScopes) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("google_provider_token")
-          localStorage.setItem("google_provider_token_rejected", "true")
-        }
         return {
           success: false,
           code: "GMAIL_INSUFFICIENT_SCOPES",
           status: 403,
           error:
-            "Your Google account has not granted permission to send emails. Please re-authorize Google to grant send access.",
+            "Your Google account has not granted permission to send emails. Please ensure permissions were granted during login.",
         }
       }
 
@@ -473,16 +458,12 @@ export async function sendGmailDraft(params: {
         errorMsg.toLowerCase().includes("insufficient")
 
       if (isInsufficientScopes) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("google_provider_token")
-          localStorage.setItem("google_provider_token_rejected", "true")
-        }
         return {
           success: false,
           code: "GMAIL_INSUFFICIENT_SCOPES",
           status: 403,
           error:
-            "Your Google account has not granted permission to send drafts. Please re-authorize Google to grant send access.",
+            "Your Google account has not granted permission to send drafts. Please ensure permissions were granted during login.",
         }
       }
 
@@ -567,16 +548,12 @@ export async function saveGmailDraft(params: {
           errorMsg.toLowerCase().includes("insufficient")
 
         if (isInsufficientScopes) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("google_provider_token")
-            localStorage.setItem("google_provider_token_rejected", "true")
-          }
           return {
             success: false,
             code: "GMAIL_INSUFFICIENT_SCOPES",
             status: 403,
             error:
-              "Your Google account has not granted permission to manage drafts. Please re-authorize Google to grant compose access.",
+              "Your Google account has not granted permission to manage drafts. Please ensure permissions were granted during login.",
           }
         }
 
@@ -612,16 +589,12 @@ export async function saveGmailDraft(params: {
           errorMsg.toLowerCase().includes("insufficient")
 
         if (isInsufficientScopes) {
-          if (typeof window !== "undefined") {
-            localStorage.removeItem("google_provider_token")
-            localStorage.setItem("google_provider_token_rejected", "true")
-          }
           return {
             success: false,
             code: "GMAIL_INSUFFICIENT_SCOPES",
             status: 403,
             error:
-              "Your Google account has not granted permission to manage drafts. Please re-authorize Google to grant compose access.",
+              "Your Google account has not granted permission to manage drafts. Please ensure permissions were granted during login.",
           }
         }
 
@@ -689,13 +662,6 @@ export async function fetchAllGmailFolders(
       throw apiErr
     }
 
-    if (profileRes.status === 401 || profileRes.status === 403) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("google_provider_token")
-        localStorage.setItem("google_provider_token_rejected", "true")
-      }
-    }
-
     if (detailedMsg.toLowerCase().includes("scope") || profileRes.status === 403) {
       const scopeErr = new Error(`GMAIL_INSUFFICIENT_SCOPES: ${detailedMsg}`)
       ;(scopeErr as any).status = 403
@@ -757,10 +723,6 @@ export async function fetchAllGmailFolders(
     (r) => r.status === "fulfilled" && (r.value.status === 401 || r.value.status === 403)
   )
   if (authForbidden) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("google_provider_token")
-      localStorage.setItem("google_provider_token_rejected", "true")
-    }
     const scopeErr = new Error("GMAIL_INSUFFICIENT_SCOPES: Google authorization expired or insufficient scopes")
     ;(scopeErr as any).status = 403
     ;(scopeErr as any).code = "GMAIL_INSUFFICIENT_SCOPES"
@@ -936,10 +898,6 @@ export async function fetchAllGmailFolders(
   }
 
   if (authErrorDetected) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("google_provider_token")
-      localStorage.setItem("google_provider_token_rejected", "true")
-    }
     const scopeErr = new Error("GMAIL_INSUFFICIENT_SCOPES: Google authorization expired or insufficient scopes")
     ;(scopeErr as any).status = 403
     ;(scopeErr as any).code = "GMAIL_INSUFFICIENT_SCOPES"
