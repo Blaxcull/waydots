@@ -432,7 +432,10 @@ export default function MailView() {
       const refined = await refineDraftWithAiPrompt(selectedEmail, currentText, promptText)
       setDraftEditText(refined)
       updateEmailDraft(selectedEmail.id, { suggestedReply: refined })
-      triggerToast(`Draft updated: "${promptText}"`)
+      const toastLabel = instructionToUse
+        ? "Draft updated with AI!"
+        : `Draft updated: "${promptText.length > 30 ? promptText.slice(0, 30) + "..." : promptText}"`
+      triggerToast(toastLabel)
       setAiPromptInstruction("")
     } catch {
       triggerToast("Could not refine draft.")

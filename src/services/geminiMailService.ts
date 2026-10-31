@@ -209,7 +209,7 @@ Analyze each email and output a JSON array of objects with the exact schema:
 Always return valid JSON only.`;
 
   // Primary model is gemini-3.5-flash-lite (fast & current), with fallbacks
-  const models = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-1.5-flash"]
+  const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
   let lastError = ""
 
   for (const model of models) {
@@ -218,7 +218,7 @@ Always return valid JSON only.`;
         "Content-Type": "application/json",
         "x-goog-api-key": apiKey,
       }
-      if (apiKey.startsWith("AQ.") || apiKey.startsWith("ya29.")) {
+      if (apiKey.startsWith("ya29.")) {
         headers["Authorization"] = `Bearer ${apiKey}`
       }
 
@@ -226,7 +226,7 @@ Always return valid JSON only.`;
       const response = await fetch(url, {
         method: "POST",
         headers,
-        signal: AbortSignal.timeout(4000),
+        signal: AbortSignal.timeout(8000),
         body: JSON.stringify({
           contents: [
             {
@@ -403,14 +403,14 @@ export async function refineDraftWithAiPrompt(
   const apiKey = getGeminiApiKey()
 
   if (apiKey) {
-    const models = ["gemini-3.5-flash-lite", "gemini-2.5-flash"]
+    const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     for (const model of models) {
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
           "x-goog-api-key": apiKey,
         }
-        if (apiKey.startsWith("AQ.") || apiKey.startsWith("ya29.")) {
+        if (apiKey.startsWith("ya29.")) {
           headers["Authorization"] = `Bearer ${apiKey}`
         }
 
@@ -438,7 +438,7 @@ Rules:
         const response = await fetch(url, {
           method: "POST",
           headers,
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
@@ -452,7 +452,11 @@ Rules:
         const data = await response.json()
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
         if (text) {
-          return text
+          const clean = text
+            .replace(/^```(?:markdown|text)?\s*/i, "")
+            .replace(/```$/i, "")
+            .trim()
+          return clean
         }
       } catch {
         // try next model
@@ -726,14 +730,14 @@ export async function generateContextualDraft(
   const heuristic = generateHeuristicReply(email, conflict)
 
   if (apiKey) {
-    const models = ["gemini-3.5-flash-lite", "gemini-2.5-flash"]
+    const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
     for (const model of models) {
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
           "x-goog-api-key": apiKey,
         }
-        if (apiKey.startsWith("AQ.") || apiKey.startsWith("ya29.")) {
+        if (apiKey.startsWith("ya29.")) {
           headers["Authorization"] = `Bearer ${apiKey}`
         }
 
@@ -770,7 +774,7 @@ Output JSON format only:
         const response = await fetch(url, {
           method: "POST",
           headers,
-          signal: AbortSignal.timeout(5000),
+          signal: AbortSignal.timeout(8000),
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
@@ -785,7 +789,12 @@ Output JSON format only:
         const data = await response.json()
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
         if (text) {
-          const parsed = JSON.parse(text)
+          const cleanedText = text
+            .replace(/^```json\s*/i, "")
+            .replace(/^```\s*/i, "")
+            .replace(/```$/i, "")
+            .trim()
+          const parsed = JSON.parse(cleanedText)
           return {
             suggestedReply: parsed.reply || heuristic.suggestedReply,
             suggestedSlot: parsed.suggestedSlot || heuristic.suggestedSlot,
