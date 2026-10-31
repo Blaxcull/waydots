@@ -324,5 +324,20 @@ describe("MailView Composer & Header Layout", () => {
 
     expect(screen.getAllByText("Trashed Newsletter Subject").length).toBeGreaterThanOrEqual(1)
     expect(screen.getByText("Back to Trash Overview")).toBeInTheDocument()
+
+    // Verify there is no delete button / trash icon when in trash
+    expect(screen.queryByTitle("Delete")).not.toBeInTheDocument()
+
+    // Verify Empty Trash button is rendered on top right
+    const emptyTrashBtns = screen.getAllByRole("button", { name: /Empty Trash/i })
+    expect(emptyTrashBtns.length).toBeGreaterThanOrEqual(1)
+
+    // Click Empty Trash
+    fireEvent.click(emptyTrashBtns[0])
+
+    // Verify trash was emptied
+    await waitFor(() => {
+      expect(screen.queryByText("Trashed Newsletter Subject")).not.toBeInTheDocument()
+    })
   })
 })

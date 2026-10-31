@@ -321,6 +321,7 @@ interface EmailStoreState {
   sendDraft: (draftId: string, updatedBody?: string, updatedRecipient?: string) => void
   deleteEmail: (id: string) => void
   restoreDeletedEmails: (emails: Email[]) => void
+  emptyTrash: () => void
   markBatchAsRead: (ids: string[]) => void
   markBatchAsUnread: (ids: string[]) => void
   deleteBatchEmails: (ids: string[]) => void
@@ -598,6 +599,14 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         emails: [...missing, ...updated],
       }
     }),
+
+  emptyTrash: () =>
+    set((state) => ({
+      emails: state.emails.filter((e) => !e.isTrash),
+      selectedEmailId: state.emails.find((e) => e.id === state.selectedEmailId)?.isTrash
+        ? null
+        : state.selectedEmailId,
+    })),
 
   markBatchAsRead: (ids) =>
     set((state) => ({

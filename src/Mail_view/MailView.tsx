@@ -617,6 +617,7 @@ export default function MailView() {
     toggleStarEmail,
     deleteEmail,
     restoreDeletedEmails,
+    emptyTrash,
     markBatchAsRead,
     markBatchAsUnread,
     deleteBatchEmails,
@@ -948,7 +949,7 @@ export default function MailView() {
 
   const handleDeleteSingleEmail = useCallback(
     (email: Email) => {
-      if (email.isSent || activeFolder === "sent") return
+      if (email.isSent || activeFolder === "sent" || activeFolder === "trash") return
       deleteEmail(email.id)
       updateCacheAfterDelete([email.id])
       showTrashToast([email], "Conversation moved to Trash.")
@@ -962,6 +963,26 @@ export default function MailView() {
     },
     [activeFolder, deleteEmail, updateCacheAfterDelete]
   )
+
+  const handleEmptyTrash = useCallback(() => {
+    const trashedEmails = emails.filter((e) => e.isTrash)
+    if (trashedEmails.length === 0) return
+    emptyTrash()
+    setSelectedEmailIds([])
+    triggerToast("Trash emptied.")
+    void (async () => {
+      const token = await getGoogleProviderToken()
+      if (!token) return
+      await Promise.allSettled(
+        trashedEmails.map((e) =>
+          fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${e.id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        )
+      )
+    })().catch(() => {})
+  }, [emails, emptyTrash])
 
   const handleUndoTrash = () => {
     if (!trashToast || trashToast.emails.length === 0) return
@@ -1286,7 +1307,19 @@ export default function MailView() {
         }
       }
     } catch (err: any) {
-      if (!isSilent) {
+      if (
+        err?.status === 401 ||
+        err?.code === "GMAIL_TOKEN_EXPIRED" ||
+        err?.message?.includes("401") ||
+        err?.message?.includes("invalid authentication")
+      ) {
+        if (typeof window !== "undefined") {
+          localStorage.removeItem("google_provider_token")
+        }
+        if (!isSilent) {
+          triggerToast("Google session has expired. Please sign in again with Google to reconnect.")
+        }
+      } else if (!isSilent) {
         if (
           err?.code === "GMAIL_API_DISABLED" ||
           err?.message?.includes("not enabled in your Google Cloud") ||
@@ -1303,7 +1336,9 @@ export default function MailView() {
           triggerToast(err?.message || "Failed to fetch emails from Gmail")
         }
       }
-      console.warn("Gmail sync error:", err)
+      if (err?.status !== 401 && err?.code !== "GMAIL_TOKEN_EXPIRED") {
+        console.warn("Gmail sync error:", err)
+      }
     } finally {
       setIsGmailSyncing(false)
     }
@@ -1756,6 +1791,19 @@ export default function MailView() {
                     </>
                   )}
                 </button>
+
+                {/* Empty Trash Button on Top Right (only shown in Trash) */}
+                {activeFolder === "trash" && (
+                  <button
+                    type="button"
+                    onClick={handleEmptyTrash}
+                    disabled={folderEmails.length === 0}
+                    title="Permanently empty all items in Trash"
+                    className="ml-auto flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
+                  >
+                    <span>Empty Trash</span>
+                  </button>
+                )}
               </div>
 
               {searchQuery && (
@@ -1884,7 +1932,7 @@ export default function MailView() {
                       <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
                       <span>Star</span>
                     </button>
-                    {activeFolder !== "sent" && (
+                    {activeFolder !== "sent" && activeFolder !== "trash" && (
                       <button
                         type="button"
                         onClick={handleBatchDelete}
@@ -2166,12 +2214,12 @@ export default function MailView() {
                         <div className="relative flex items-center justify-end w-24 shrink-0">
                           <span
                             className={`text-xs font-medium text-neutral-400 ${
-                              !email.isSent && activeFolder !== "sent" ? "group-hover:opacity-0" : ""
+                              !email.isSent && activeFolder !== "sent" && activeFolder !== "trash" ? "group-hover:opacity-0" : ""
                             } transition-opacity tabular-nums`}
                           >
                             {email.timestamp}
                           </span>
-                          {!email.isSent && activeFolder !== "sent" && (
+                          {!email.isSent && activeFolder !== "sent" && activeFolder !== "trash" && (
                             <button
                               type="button"
                               onClick={(e) => {
@@ -2245,7 +2293,7 @@ export default function MailView() {
                           }`}
                         />
                       </button>
-                      {!selectedEmail.isSent && activeFolder !== "sent" && (
+                      {!selectedEmail.isSent && activeFolder !== "sent" && activeFolder !== "trash" && (
                         <button
                           type="button"
                           onClick={() => {
@@ -2255,6 +2303,16 @@ export default function MailView() {
                           title="Delete"
                         >
                           <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
+                      {activeFolder === "trash" && (
+                        <button
+                          type="button"
+                          onClick={handleEmptyTrash}
+                          className="rounded-full border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 px-3 py-1 text-xs font-semibold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                          title="Permanently empty all items in Trash"
+                        >
+                          Empty Trash
                         </button>
                       )}
                     </div>
@@ -2463,12 +2521,12 @@ export default function MailView() {
                           <div className="relative flex items-center justify-end">
                             <span
                               className={`text-xs text-neutral-400 ${
-                                !email.isSent && activeFolder !== "sent" ? "group-hover:opacity-0" : ""
+                                !email.isSent && activeFolder !== "sent" && activeFolder !== "trash" ? "group-hover:opacity-0" : ""
                               } transition-opacity tabular-nums`}
                             >
                               {email.timestamp}
                             </span>
-                            {!email.isSent && activeFolder !== "sent" && (
+                            {!email.isSent && activeFolder !== "sent" && activeFolder !== "trash" && (
                               <button
                                 type="button"
                                 onClick={(e) => {
