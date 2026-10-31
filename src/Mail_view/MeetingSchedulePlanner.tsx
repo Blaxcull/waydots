@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Plus,
   Check,
   Sparkles,
   ListTodo,
@@ -57,7 +56,7 @@ export default function MeetingSchedulePlanner({
   )
 
   // Status feedback state
-  const [addedStatus, setAddedStatus] = useState<"idle" | "event" | "task" | "both">("idle")
+  const [addedStatus, setAddedStatus] = useState<"idle" | "event" | "task">("idle")
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null)
 
   // Read stores for reactive conflict checking
@@ -114,7 +113,7 @@ export default function MeetingSchedulePlanner({
         description: `Meeting request from ${email.senderName} (${email.senderEmail})\nSubject: ${email.subject}`,
         color: "#4f46e5",
       })
-      setAddedStatus((prev) => (prev === "task" ? "both" : "event"))
+      setAddedStatus("event")
       setFeedbackMessage(`Calendar event created for ${formatMinutesToTime(startTime)} on ${date}!`)
       setTimeout(() => setFeedbackMessage(null), 4000)
     } catch (err: any) {
@@ -126,27 +125,18 @@ export default function MeetingSchedulePlanner({
   const handleAddTask = () => {
     try {
       useTasksStore.getState().addTask({
-        title: `Prepare: ${title}`,
+        title,
         dueDate: date,
         dueTime: formatMinutesToTime(startTime),
         notes: `Meeting with ${email.senderName} (${email.senderEmail})`,
         priority: "p2",
       })
-      setAddedStatus((prev) => (prev === "event" ? "both" : "task"))
-      setFeedbackMessage(`To-Do item added for ${formatMinutesToTime(startTime)} on ${date}!`)
+      setAddedStatus("task")
+      setFeedbackMessage(`To-Do created for ${formatMinutesToTime(startTime)} on ${date}!`)
       setTimeout(() => setFeedbackMessage(null), 4000)
     } catch (err: any) {
       setFeedbackMessage(err?.message || "Failed to add task")
     }
-  }
-
-  // Action: Add Both Event & To-Do
-  const handleAddBoth = async () => {
-    await handleAddEvent()
-    handleAddTask()
-    setAddedStatus("both")
-    setFeedbackMessage(`✓ Event & To-Do scheduled for ${formatMinutesToTime(startTime)} on ${date}!`)
-    setTimeout(() => setFeedbackMessage(null), 5000)
   }
 
   // Action: Update AI Draft with confirmed date/time
@@ -170,7 +160,7 @@ export default function MeetingSchedulePlanner({
           </div>
           <div className="min-w-0">
             <div className="text-xs font-bold text-neutral-800 flex items-center gap-2 truncate">
-              <span>Event &amp; To-Do Scheduler</span>
+              <span>Meeting Scheduler</span>
               <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold text-neutral-600 border border-neutral-200">
                 {formatMinutesToTime(startTime)} ({duration}m)
               </span>
@@ -203,7 +193,7 @@ export default function MeetingSchedulePlanner({
         <div className="flex flex-col gap-3 pt-2 border-t border-gray-200/80 animate-in fade-in duration-200">
           {/* Row 1: Title input */}
           <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-semibold text-neutral-600">Event &amp; Task Title</label>
+            <label className="text-[11px] font-semibold text-neutral-600">Meeting / Task Title</label>
             <input
               type="text"
               value={title}
@@ -339,37 +329,36 @@ export default function MeetingSchedulePlanner({
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                onClick={handleAddBoth}
+                onClick={handleAddEvent}
                 className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
-                  addedStatus === "both"
+                  addedStatus === "event"
                     ? "bg-emerald-600 text-white shadow-2xs"
                     : "bg-neutral-900 text-white hover:bg-neutral-800 shadow-sm"
                 }`}
               >
-                {addedStatus === "both" ? (
+                {addedStatus === "event" ? (
                   <Check className="h-3.5 w-3.5" />
                 ) : (
-                  <Plus className="h-3.5 w-3.5" />
+                  <Calendar className="h-3.5 w-3.5" />
                 )}
-                <span>{addedStatus === "both" ? "Event & To-Do Added!" : "Set Event & To-Do"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleAddEvent}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
-              >
-                <Calendar className="h-3.5 w-3.5 text-neutral-600" />
-                <span>Calendar Event Only</span>
+                <span>{addedStatus === "event" ? "Calendar Event Added!" : "Set Calendar Event"}</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleAddTask}
-                className="flex items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
+                  addedStatus === "task"
+                    ? "bg-emerald-600 text-white shadow-2xs"
+                    : "border border-gray-300 bg-white text-neutral-800 hover:bg-neutral-100 shadow-2xs"
+                }`}
               >
-                <ListTodo className="h-3.5 w-3.5 text-neutral-600" />
-                <span>To-Do Only</span>
+                {addedStatus === "task" ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : (
+                  <ListTodo className="h-3.5 w-3.5 text-neutral-600" />
+                )}
+                <span>{addedStatus === "task" ? "To-Do Added!" : "Set To-Do"}</span>
               </button>
             </div>
 

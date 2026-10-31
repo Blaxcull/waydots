@@ -263,7 +263,7 @@ describe("MailView Composer & Header Layout", () => {
     render(<MailView />)
 
     // Verify Scheduler is present
-    expect(screen.getByText(/Event & To-Do Scheduler/i)).toBeInTheDocument()
+    expect(screen.getByText(/Meeting Scheduler/i)).toBeInTheDocument()
     expect(screen.getByText(/Hide Controls/i)).toBeInTheDocument()
 
     // Verify conflict status is displayed
@@ -271,13 +271,22 @@ describe("MailView Composer & Header Layout", () => {
       screen.getByText(/completely free in both your Calendar and To-Dos/i)
     ).toBeInTheDocument()
 
-    // Click "Set Event & To-Do"
-    const setEventAndTodoBtn = screen.getByRole("button", { name: /Set Event & To-Do/i })
-    fireEvent.click(setEventAndTodoBtn)
+    // Click "Set Calendar Event"
+    const setEventBtn = screen.getByRole("button", { name: /Set Calendar Event/i })
+    fireEvent.click(setEventBtn)
 
-    // Verify confirmation
+    // Verify confirmation for Calendar Event
     await waitFor(() => {
-      expect(screen.getByText(/Event & To-Do Added!/i)).toBeInTheDocument()
+      expect(screen.getByText(/Calendar Event Added!/i)).toBeInTheDocument()
+    })
+
+    // Click "Set To-Do"
+    const setTodoBtn = screen.getByRole("button", { name: /Set To-Do/i })
+    fireEvent.click(setTodoBtn)
+
+    // Verify confirmation for To-Do
+    await waitFor(() => {
+      expect(screen.getByText(/To-Do Added!/i)).toBeInTheDocument()
     })
 
     // Click "Update AI Draft with this Time"
