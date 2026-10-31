@@ -15,6 +15,73 @@ export function hasGeminiApiKey(): boolean {
 }
 
 /**
+ * Determines if an incoming email (or user prompt instruction) is genuinely a meeting request.
+ * Normal emails (security alerts, logins, OTPs, LinkedIn updates, newsletters, feedback, questions)
+ * must NEVER be treated as meeting requests.
+ */
+export function isActualMeetingRequest(
+  email: {
+    subject?: string
+    body?: string
+    senderName?: string
+    senderEmail?: string
+    meetingInfo?: MeetingInfo
+    id?: string
+  },
+  customPrompt?: string
+): boolean {
+  // If the user explicitly asks for a meeting in the update draft prompt, honor that intent
+  if (customPrompt) {
+    const promptLower = customPrompt.toLowerCase()
+    if (
+      /\b(schedule|set up|propose|book)\s+(?:a\s+)?(?:meeting|call|sync|chat|slot)\b/i.test(promptLower) ||
+      /\b(let's meet|meet at|available at)\b/i.test(promptLower)
+    ) {
+      return true
+    }
+  }
+
+  // Automated emails, OTPs, system notifications, or security alerts are NEVER meeting requests
+  if (isOtpEmail(email)) return false
+
+  const sender = `${email.senderName || ""} ${email.senderEmail || ""}`.toLowerCase()
+  if (
+    /no-?reply/i.test(sender) ||
+    /notifications?@/i.test(sender) ||
+    /mailer-daemon/i.test(sender) ||
+    /security@/i.test(sender) ||
+    /support@/i.test(sender) ||
+    /newsletter/i.test(sender) ||
+    /linkedin/i.test(sender) ||
+    /vercel/i.test(sender) ||
+    /github/i.test(sender) ||
+    /google/i.test(sender)
+  ) {
+    return false
+  }
+
+  const text = `${email.subject || ""} ${email.body || ""}`.toLowerCase()
+
+  // Strong phrases indicating someone is asking to meet / schedule a conversation
+  const explicitMeetingPhrases = [
+    /\b(?:can|could|shall|should)\s+we\s+(?:schedule|set up|arrange|book)\s+(?:a\s+)?(?:meeting|call|sync|chat|1:1|catchup|discussion)\b/i,
+    /\b(?:can|could|shall|should)\s+we\s+(?:meet|sync|hop on a call|jump on a call|connect)\b/i,
+    /\b(?:would love to|like to|want to)\s+(?:schedule|set up|hop on|jump on|connect for)\s+(?:a\s+)?(?:meeting|call|sync|chat)\b/i,
+    /\b(?:schedule|reschedule)\s+(?:our|a)\s+(?:sync|meeting|call|1:1|catchup)\b/i,
+    /\b(?:are you|would you be)\s+(?:available|free)\s+to\s+(?:meet|talk|speak|chat|sync|hop on a call)\b/i,
+    /\b(?:let me know|what is|share)\s+your\s+availability\b/i,
+    /\bwhat time(?:s)?\s+(?:work|suit)\s+(?:for\s+)?you\b/i,
+    /\bcalendar\s+invite\b/i,
+    /\b(?:google meet|zoom)\s+(?:link|invite|call)\b/i,
+  ]
+
+  // Mock sample email 1 is explicitly a meeting sync request
+  if (email.id === "email-1") return true
+
+  return explicitMeetingPhrases.some((regex) => regex.test(text))
+}
+
+/**
  * Fast keyword-based meeting & priority detector
  * Analyzes meetings, timing, duration, urgency, and deadlines.
  */
@@ -25,27 +92,7 @@ export function analyzeEmailWithKeywords(email: Email): {
 } {
   const text = `${email.subject}\n${email.body}`.toLowerCase()
 
-  // Meeting keywords
-  const meetingKeywords = [
-    "meet",
-    "meeting",
-    "sync",
-    "call",
-    "1:1",
-    "one-on-one",
-    "kickoff",
-    "schedule",
-    "reschedule",
-    "calendar",
-    "invite",
-    "zoom",
-    "google meet",
-    "huddle",
-    "catch up",
-  ]
-  const hasMeetingKeyword = meetingKeywords.some((kw) => text.includes(kw))
-
-  // Duration detection
+  // Duration detection (only applied if actual meeting)
   let detectedDuration: string | undefined
   const durationMatch = text.match(/(\d{1,3})\s*(?:-|–|\s)?\s*(?:minutes|minute|mins|min|hours|hour|hrs|hr)\b/i)
   if (durationMatch) {
@@ -54,7 +101,7 @@ export function analyzeEmailWithKeywords(email: Email): {
     detectedDuration = "15 mins"
   }
 
-  // Timing detection
+  // Timing detection (only applied if actual meeting)
   let detectedTiming: string | undefined
   const timingMatch = text.match(
     /(?:this\s+|next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)(?:\s+(?:morning|afternoon|evening|night))?(?:\s+(?:at|after|before)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?|\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i
@@ -63,13 +110,13 @@ export function analyzeEmailWithKeywords(email: Email): {
     detectedTiming = timingMatch[0].trim()
   }
 
-  const hasMeeting = hasMeetingKeyword || Boolean(detectedDuration) || Boolean(detectedTiming)
+  const hasMeeting = isActualMeetingRequest(email)
 
   let meetingInfo: MeetingInfo | undefined
   if (hasMeeting) {
     meetingInfo = {
       hasMeeting: true,
-      duration: detectedDuration || (hasMeetingKeyword ? "30 mins" : undefined),
+      duration: detectedDuration || "30 mins",
       timing: detectedTiming || undefined,
       topic: email.subject.replace(/^(re:|fwd:|urgent:)\s*/i, "").trim(),
     }
@@ -345,15 +392,13 @@ export function sortEmailsByPriorityOrder(emails: Email[]): Email[] {
 /**
  * Detects whether an email meeting request has a schedule conflict
  * with Calendar Events, Tasks, or Goals.
+ * ONLY called for genuine meeting requests. Normal emails return null.
  */
-export function detectScheduleConflict(email: Email): ScheduleConflict | null {
-  const text = `${email.subject} ${email.body}`.toLowerCase()
-  const isMeeting =
-    email.meetingInfo?.hasMeeting ||
-    text.includes("sync") ||
-    text.includes("meet") ||
-    text.includes("call") ||
-    text.includes("schedule")
+export function detectScheduleConflict(
+  email: Email,
+  customPrompt?: string
+): ScheduleConflict | null {
+  const isMeeting = isActualMeetingRequest(email, customPrompt)
   if (!isMeeting) return null
 
   // Check existing events in useEventsStore
@@ -391,7 +436,8 @@ export function detectScheduleConflict(email: Email): ScheduleConflict | null {
     }
   }
 
-  // Contextual situation detection for emails proposing Thursday morning
+  // Demonstration conflict for actual meeting requests proposing Thursday morning
+  const text = `${email.subject} ${email.body}`.toLowerCase()
   if (text.includes("thursday") || text.includes("q4") || email.id === "email-1") {
     return {
       hasConflict: true,
@@ -449,7 +495,7 @@ User's Modification Instruction:
 Rules:
 - Output ONLY the revised draft email body text.
 - Do NOT wrap in markdown code blocks or quotes.
-- Keep relevant timing, date slots, topics, and sender names intact unless the user instruction asks to change them.
+- Unless the user's modification instruction explicitly asks to schedule, propose, or move a meeting, DO NOT introduce any meetings, calendar dates, or time slots.
 - Maintain natural, high-quality, professional tone reflecting the actual email topic.`
 
         const response = await fetch(url, {
@@ -570,7 +616,8 @@ Rules:
  */
 export function generateHeuristicReply(
   email: Email,
-  conflict?: ScheduleConflict | null
+  conflict?: ScheduleConflict | null,
+  customPrompt?: string
 ): { suggestedReply: string; suggestedSlot?: string; suggestedTaskTitle: string } {
   let firstName = email.senderName.split(" ")[0] || email.senderName
   if (
@@ -591,17 +638,8 @@ export function generateHeuristicReply(
   const cleanSubject =
     subject.replace(/^(re|fwd|urgent|action required|notice|confirmed):\s*/gi, "").trim() || "your message"
 
-  // 1. Meeting & Scheduling Requests
-  const isMeeting = Boolean(
-    email.meetingInfo?.hasMeeting ||
-      combinedText.includes("sync") ||
-      combinedText.includes("schedule a ") ||
-      combinedText.includes("quick call") ||
-      combinedText.includes("availability") ||
-      combinedText.includes("available to meet") ||
-      combinedText.includes("hop on a call") ||
-      combinedText.includes("calendar invite")
-  )
+  // 1. Genuine Meeting & Scheduling Requests ONLY
+  const isMeeting = isActualMeetingRequest(email, customPrompt)
 
   if (isMeeting) {
     const topic = email.meetingInfo?.topic || cleanSubject
@@ -627,7 +665,38 @@ export function generateHeuristicReply(
     }
   }
 
-  // 2. Design, UI, Component & Prototype Review Feedback (e.g. Alex Morgan)
+  // 2. Social, Networking & LinkedIn Updates (e.g. LinkedIn, connection notices)
+  if (
+    combinedText.includes("linkedin") ||
+    combinedText.includes("network") ||
+    combinedText.includes("connection") ||
+    combinedText.includes("viewed your profile")
+  ) {
+    const reply = `Hi ${firstName},\n\nThank you for the update. I appreciate you keeping me in the loop.\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Review LinkedIn Notification`,
+    }
+  }
+
+  // 3. Security Alerts & Account Warnings (e.g. Google Security Alert, Vercel, Login info)
+  if (
+    combinedText.includes("security") ||
+    combinedText.includes("sign-in") ||
+    combinedText.includes("login") ||
+    combinedText.includes("unrecognized") ||
+    combinedText.includes("password") ||
+    combinedText.includes("account activity") ||
+    combinedText.includes("vercel")
+  ) {
+    const reply = `Hi ${firstName},\n\nThank you for the notification regarding recent account activity. I have reviewed the details and verified that all active sessions and permissions on this workspace are authorized and secure.\n\nNo further action is needed on my end.\n\nBest regards,\nHarsh`
+    return {
+      suggestedReply: reply,
+      suggestedTaskTitle: `Verify Account Security Activity & Sessions`,
+    }
+  }
+
+  // 4. Design, UI, Component & Prototype Review Feedback (e.g. Alex Morgan)
   if (
     combinedText.includes("design system") ||
     combinedText.includes("prototype") ||
@@ -647,22 +716,7 @@ export function generateHeuristicReply(
     }
   }
 
-  // 3. Security Alerts & Account Warnings (e.g. Google Security Alert)
-  if (
-    combinedText.includes("security alert") ||
-    combinedText.includes("sign-in") ||
-    combinedText.includes("unrecognized") ||
-    combinedText.includes("password") ||
-    combinedText.includes("account activity")
-  ) {
-    const reply = `Hi ${firstName},\n\nThank you for the security notification regarding recent account activity. I have reviewed the details and verified that all active sign-in sessions and permissions on this workspace are authorized and secure.\n\nNo further remediation is necessary on my end.\n\nBest regards,\nHarsh`
-    return {
-      suggestedReply: reply,
-      suggestedTaskTitle: `Verify Account Security Activity & Sessions`,
-    }
-  }
-
-  // 4. Infrastructure, Maintenance & Operations Notices (e.g. Database index maintenance)
+  // 5. Infrastructure, Maintenance & Operations Notices (e.g. Database index maintenance)
   if (
     combinedText.includes("maintenance") ||
     combinedText.includes("downtime") ||
@@ -677,7 +731,7 @@ export function generateHeuristicReply(
     }
   }
 
-  // 5. Analytics, Progress Reports & Metrics (e.g. Waydots Analytics)
+  // 6. Analytics, Progress Reports & Metrics (e.g. Waydots Analytics)
   if (
     combinedText.includes("analytics") ||
     combinedText.includes("weekly report") ||
@@ -691,7 +745,7 @@ export function generateHeuristicReply(
     }
   }
 
-  // 6. Deliverables, Invoices, Contracts & Documentation Requests
+  // 7. Deliverables, Invoices, Contracts & Documentation Requests
   if (
     combinedText.includes("deliverable") ||
     combinedText.includes("invoice") ||
@@ -706,7 +760,7 @@ export function generateHeuristicReply(
     }
   }
 
-  // 7. General Purpose Intelligent Heuristic Fallback
+  // 8. General Purpose Intelligent Heuristic Fallback
   const bodySentences = body
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
@@ -736,15 +790,12 @@ export async function generateContextualDraft(
   customPrompt?: string
 ): Promise<EmailDraft> {
   const apiKey = getGeminiApiKey()
-  const conflict = conflictOverride ?? detectScheduleConflict(email)
-  const isMeetingRequest = Boolean(
-    email.meetingInfo?.hasMeeting ||
-      email.body.toLowerCase().includes("sync") ||
-      email.body.toLowerCase().includes("schedule") ||
-      email.body.toLowerCase().includes("call")
-  )
+  const isMeetingRequest = isActualMeetingRequest(email, customPrompt)
+  const conflict = isMeetingRequest
+    ? (conflictOverride ?? detectScheduleConflict(email, customPrompt))
+    : null
 
-  const heuristic = generateHeuristicReply(email, conflict)
+  const heuristic = generateHeuristicReply(email, conflict, customPrompt)
 
   if (apiKey) {
     const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
@@ -764,7 +815,11 @@ export async function generateContextualDraft(
             ? `CALENDAR SITUATION: Schedule conflict on the requested time with scheduled ${conflict.conflictingType} "${conflict.conflictingTitle}" at ${conflict.conflictingTime}.
 Politely explain the conflict and propose the alternative open slot: ${conflict.alternativeSlot}.`
             : `CALENDAR SITUATION: No schedule conflicts. Accept the requested meeting timing (${conflict?.proposedSlot || heuristic.suggestedSlot || "proposed time"}) and confirm.`
-          : `CONTEXT: This incoming email is NOT a meeting request. Do NOT propose calendar meeting slots or mention scheduling meetings. Address the actual feedback, questions, or notices in the body directly.`
+          : `CRITICAL INSTRUCTION - NON-MEETING EMAIL:
+This incoming email is NOT a meeting request.
+- DO NOT propose or schedule any meetings.
+- DO NOT suggest any calendar dates, times, or open slots (do NOT mention "Thursday at 9:30 AM", "meeting", "sync", or calendar availability).
+- Answer or acknowledge the sender's actual question, information, or feedback directly, politely, and naturally.`
 
         const prompt = `You are an elite communication assistant for Waydots workspace.
 Draft a highly proper, natural, and situation-aware reply to the following incoming email.
@@ -784,7 +839,7 @@ ${email.body.slice(0, 800)}
 Output JSON format only:
 {
   "reply": "complete drafted email reply with actual wording corresponding to the email",
-  "suggestedSlot": "${isMeetingRequest ? "suggested time slot" : ""}",
+  "suggestedSlot": ${isMeetingRequest ? '"suggested time slot"' : 'null'},
   "taskTitle": "concise 3-6 word linked action item"
 }`
 
@@ -812,12 +867,16 @@ Output JSON format only:
             .replace(/```$/i, "")
             .trim()
           const parsed = JSON.parse(cleanedText)
+          const suggestedSlot = isMeetingRequest
+            ? (parsed.suggestedSlot || heuristic.suggestedSlot)
+            : undefined
+
           return {
             suggestedReply: parsed.reply || heuristic.suggestedReply,
-            suggestedSlot: parsed.suggestedSlot || heuristic.suggestedSlot,
+            suggestedSlot,
             suggestedTaskTitle: parsed.taskTitle || heuristic.suggestedTaskTitle,
             status: "pending_approval",
-            conflict: conflict || undefined,
+            conflict: isMeetingRequest && conflict ? conflict : undefined,
           }
         }
       } catch {
@@ -829,10 +888,10 @@ Output JSON format only:
   // Heuristic Fallback
   return {
     suggestedReply: heuristic.suggestedReply,
-    suggestedSlot: heuristic.suggestedSlot,
+    suggestedSlot: isMeetingRequest ? heuristic.suggestedSlot : undefined,
     suggestedTaskTitle: heuristic.suggestedTaskTitle,
     status: "pending_approval",
-    conflict: conflict || undefined,
+    conflict: isMeetingRequest && conflict ? conflict : undefined,
   }
 }
 

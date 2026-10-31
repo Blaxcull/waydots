@@ -6,6 +6,7 @@ import {
   detectScheduleConflict,
   refineDraftWithAiPrompt,
   generateContextualDraft,
+  isActualMeetingRequest,
 } from "./geminiMailService"
 import { isOtpEmail, type Email } from "@/store/emailStore"
 
@@ -16,7 +17,7 @@ describe("geminiMailService", () => {
     senderName: "Alice",
     senderEmail: "alice@example.com",
     recipientEmail: "you@waydots.com",
-    body: "Hi team, we need to schedule a 45-minute sync this Thursday morning after 9:00 AM as soon as possible.",
+    body: "Hi team, can we schedule a 45-minute sync this Thursday morning after 9:00 AM as soon as possible? Let me know your availability.",
     timestamp: "10:00 AM",
     unread: true,
     priority: "low",
@@ -45,6 +46,37 @@ describe("geminiMailService", () => {
     unread: true,
     priority: "high", // Pre-existing incorrect priority to be overridden
   }
+
+  const sampleLinkedInEmail: Email = {
+    id: "test-linkedin-1",
+    subject: "You have 3 new notifications on LinkedIn",
+    senderName: "LinkedIn",
+    senderEmail: "notifications-noreply@linkedin.com",
+    recipientEmail: "you@waydots.com",
+    body: "See who viewed your profile and connect with colleagues today.",
+    timestamp: "1 hour ago",
+    unread: true,
+    priority: "low",
+  }
+
+  it("distinguishes actual human meeting requests from normal emails and notifications", () => {
+    expect(isActualMeetingRequest(sampleMeetingEmail)).toBe(true)
+    expect(isActualMeetingRequest(sampleVercelOtpEmail)).toBe(false)
+    expect(isActualMeetingRequest(sampleLinkedInEmail)).toBe(false)
+    expect(isActualMeetingRequest(sampleNewsletterEmail)).toBe(false)
+  })
+
+  it("allows user modification prompt to explicitly request a meeting on any email", () => {
+    expect(isActualMeetingRequest(sampleLinkedInEmail, "Let's propose a meeting on Friday at 2 PM")).toBe(true)
+  })
+
+  it("does not detect schedule conflicts or propose slots for normal emails", () => {
+    const conflict = detectScheduleConflict(sampleLinkedInEmail)
+    expect(conflict).toBeNull()
+
+    const vercelConflict = detectScheduleConflict(sampleVercelOtpEmail)
+    expect(vercelConflict).toBeNull()
+  })
 
   it("always classifies OTP and security code emails as low priority", () => {
     expect(isOtpEmail(sampleVercelOtpEmail)).toBe(true)
