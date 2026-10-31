@@ -1,6 +1,7 @@
+import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
-import { motion } from "framer-motion";
+import { useAuthStore } from "@/store/authStore";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowRight,
   Target,
@@ -11,6 +12,13 @@ import {
   Check,
   X,
   Layers,
+  ChevronDown,
+  Mail,
+  Calendar,
+  ListTodo,
+  LogOut,
+  Sparkles,
+  Crown,
 } from "lucide-react";
 import type { SubscriptionPlan, SubscriptionStatus } from "@/hooks/useSubscription";
 
@@ -42,7 +50,7 @@ export function Home({
 }) {
   return (
     <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground font-sf-pro overflow-x-hidden">
-      <Nav isAuthenticated={isAuthenticated} />
+      <Nav isAuthenticated={isAuthenticated} isPro={isPro} subscriptionPlan={subscriptionPlan} />
       <main>
         <Hero isAuthenticated={isAuthenticated} isPro={isPro} subscriptionPlan={subscriptionPlan} subscriptionStatus={subscriptionStatus} />
         <How />
@@ -61,14 +69,326 @@ function Logo({ className = "h-7 w-7" }: { className?: string }) {
   return <img src="/applogo.png" alt="Waydots" className={className} />;
 }
 
-/* ---------- Floating pill nav ---------- */
-function Nav({ isAuthenticated }: { isAuthenticated: boolean }) {
+/* ---------- Profile dropdown menu ---------- */
+function ProfileMenu({
+  isPro = false,
+  subscriptionPlan = "free",
+}: {
+  isPro?: boolean;
+  subscriptionPlan?: SubscriptionPlan;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const user = useAuthStore((state) => state.user);
+  const signOut = useAuthStore((state) => state.signOut);
+
+  const hasProPlan = isPro || subscriptionPlan === "pro";
+
+  const [imageFailed, setImageFailed] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(() => {
+    return (
+      user?.user_metadata?.avatar_url ||
+      user?.user_metadata?.picture ||
+      user?.identities?.[0]?.identity_data?.avatar_url ||
+      user?.identities?.[0]?.identity_data?.picture ||
+      (typeof window !== "undefined" ? localStorage.getItem("user_avatar") : null) ||
+      null
+    );
+  });
+
+  const displayName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "Account";
+
+  const email = user?.email || "";
+
+  const initials =
+    displayName
+      .split(" ")
+      .filter(Boolean)
+      .map((part: string) => part.charAt(0))
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) || "U";
+
+  useEffect(() => {
+    const metaAvatar =
+      user?.user_metadata?.avatar_url ||
+      user?.user_metadata?.picture ||
+      user?.identities?.[0]?.identity_data?.avatar_url ||
+      user?.identities?.[0]?.identity_data?.picture;
+
+    if (metaAvatar) {
+      setPhotoUrl(metaAvatar);
+      setImageFailed(false);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("user_avatar", metaAvatar);
+      }
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("user_avatar");
+      if (cached) {
+        setPhotoUrl(cached);
+        return;
+      }
+      const token = localStorage.getItem("google_provider_token");
+      if (token) {
+        fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((info) => {
+            if (info?.picture) {
+              setPhotoUrl(info.picture);
+              setImageFailed(false);
+              localStorage.setItem("user_avatar", info.picture);
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [user]);
+
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    setIsOpen(false);
+    await signOut();
+    navigate("/");
   };
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent | TouchEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
+      document.addEventListener("keydown", handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  const navItems = [
+    {
+      label: "Workspace (Today)",
+      sublabel: "Calendar & schedule",
+      to: "/today",
+      icon: Calendar,
+    },
+    {
+      label: "Mail & AI",
+      sublabel: "Smart drafts & inbox",
+      to: "/mail",
+      icon: Mail,
+    },
+    {
+      label: "To-Do List",
+      sublabel: "Actionable tasks",
+      to: "/todos",
+      icon: ListTodo,
+    },
+    {
+      label: "Goals & Habits",
+      sublabel: "Milestones & targets",
+      to: "/goals",
+      icon: Target,
+    },
+    {
+      label: "Analytics",
+      sublabel: "Productivity report",
+      to: "/analysis",
+      icon: TrendingUp,
+    },
+  ];
+
+  return (
+    <div className="relative" ref={menuRef}>
+      {/* Trigger Button: circle with actual profile photo of the mail and the arrow */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center gap-1.5 rounded-full bg-foreground text-background p-1 pr-2.5 hover:opacity-90 active:scale-95 transition shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+        aria-expanded={isOpen}
+        aria-haspopup="true"
+        aria-label="User profile and options"
+      >
+        <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-background text-foreground flex items-center justify-center font-bold text-xs overflow-hidden shrink-0 border border-white/20">
+          {photoUrl && !imageFailed ? (
+            <img
+              src={photoUrl}
+              alt={displayName}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+        <ChevronDown
+          className={`w-3.5 h-3.5 sm:w-4 sm:h-4 transition-transform duration-200 opacity-80 ${
+            isOpen ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      {/* Dropdown Menu */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.96 }}
+            transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+            className="absolute right-0 top-full mt-2.5 w-72 sm:w-80 rounded-2xl bg-white dark:bg-card border border-border/80 p-2 shadow-2xl z-50 text-foreground"
+            style={{
+              boxShadow: "0 20px 40px -15px rgba(0,0,0,0.15), 0 0 1px rgba(0,0,0,0.1)",
+            }}
+          >
+            {/* Header: User Profile Info */}
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-muted/40 border border-border/40">
+              <div className="w-10 h-10 rounded-full bg-foreground text-background flex items-center justify-center font-bold text-sm overflow-hidden shrink-0 border border-border/20">
+                {photoUrl && !imageFailed ? (
+                  <img
+                    src={photoUrl}
+                    alt={displayName}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="w-full h-full object-cover"
+                    onError={() => setImageFailed(true)}
+                  />
+                ) : (
+                  <span>{initials}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-sm tracking-tight text-foreground truncate">
+                    {displayName}
+                  </p>
+                  {hasProPlan ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                      <Sparkles className="w-2.5 h-2.5" /> PRO
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-muted text-muted-foreground border border-border/60">
+                      FREE
+                    </span>
+                  )}
+                </div>
+                {email && (
+                  <p className="text-xs text-muted-foreground truncate">{email}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Navigation Section */}
+            <div className="my-1.5 px-1">
+              <p className="text-[10px] font-bold tracking-wider uppercase text-muted-foreground/70 px-2 py-1">
+                Workspace
+              </p>
+              <div className="space-y-0.5">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-foreground hover:bg-muted/70 transition group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center text-muted-foreground group-hover:text-foreground group-hover:bg-background transition shrink-0 border border-border/40">
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-xs leading-none">{item.label}</p>
+                        <p className="text-[10px] text-muted-foreground leading-none mt-1">
+                          {item.sublabel}
+                        </p>
+                      </div>
+                      <ArrowRight className="w-3 h-3 text-muted-foreground/40 group-hover:text-foreground group-hover:translate-x-0.5 transition" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="h-px bg-border/60 my-1 mx-1" />
+
+            {/* Plan / Subscription section */}
+            <div className="px-1 py-0.5">
+              <Link
+                to={hasProPlan ? "#pricing" : "/checkout"}
+                onClick={() => setIsOpen(false)}
+                className="flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium text-foreground hover:bg-muted/70 transition group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center shrink-0 border border-amber-500/20">
+                    <Crown className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-xs leading-none">
+                      {hasProPlan ? "Pro Subscription" : "Upgrade Plan"}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground leading-none mt-1">
+                      {hasProPlan ? "All features unlocked" : "Unlock unlimited AI & sync"}
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider group-hover:text-foreground">
+                  {hasProPlan ? "Active" : "Upgrade"}
+                </span>
+              </Link>
+            </div>
+
+            <div className="h-px bg-border/60 my-1 mx-1" />
+
+            {/* Logout */}
+            <div className="px-1 pt-0.5">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-red-600 hover:bg-red-500/10 transition text-left cursor-pointer"
+              >
+                <div className="w-7 h-7 rounded-lg bg-red-500/10 text-red-600 flex items-center justify-center shrink-0">
+                  <LogOut className="w-3.5 h-3.5" />
+                </div>
+                <span className="font-semibold">Sign out</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ---------- Floating pill nav ---------- */
+function Nav({
+  isAuthenticated,
+  isPro = false,
+  subscriptionPlan = "free",
+}: {
+  isAuthenticated: boolean;
+  isPro?: boolean;
+  subscriptionPlan?: SubscriptionPlan;
+}) {
   return (
     <motion.div 
       initial={{ y: -20, opacity: 0 }}
@@ -90,12 +410,7 @@ function Nav({ isAuthenticated }: { isAuthenticated: boolean }) {
           <a href="#pricing" className="hover:text-foreground transition">Pricing</a>
         </nav>
         {isAuthenticated ? (
-          <button
-            onClick={handleLogout}
-            className="rounded-full bg-foreground text-background text-sm font-medium px-5 py-2 hover:opacity-90 transition"
-          >
-            Logout
-          </button>
+          <ProfileMenu isPro={isPro} subscriptionPlan={subscriptionPlan} />
         ) : (
           <Link
             to="/signup"
