@@ -29,7 +29,7 @@ export function SearchControlButton({
             ? "h-11 w-11 sm:h-16 sm:w-16 rounded-full border border-black/5 bg-[#e7e7e4] text-slate-600 shadow-sm transition-all duration-200 ease-out hover:scale-105 hover:text-slate-800 hover:shadow-md p-0 flex items-center justify-center"
             : "h-11 w-11 sm:h-16 sm:w-16 rounded-full border-[1px] bg-[#ececeb]/95 text-slate-600 shadow-md sm:shadow-lg backdrop-blur-sm transition-all duration-200 ease-out hover:scale-110 hover:text-slate-800 hover:shadow-xl p-0 flex items-center justify-center"
         }
-        aria-label="Search events"
+        aria-label="Search"
       >
         <img src={SearchIcon} alt="Search" className="h-5 w-5 sm:h-8 sm:w-8 opacity-60" />
       </Button>

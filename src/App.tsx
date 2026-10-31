@@ -2,6 +2,9 @@ import { useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { SearchEventsDialog } from '@/SideBar/SearchEventsDialog'
 import { SearchMailDialog } from '@/Mail_view/SearchMailDialog'
+import { SearchTasksDialog } from '@/Task_view/SearchTasksDialog'
+import { SearchGoalsDialog } from '@/Goal_view/SearchGoalsDialog'
+import { SearchAnalysisDialog } from '@/Analysis_view/SearchAnalysisDialog'
 import { AppRoutes } from '@/app/AppRoutes'
 import { CompactSidebarOverlay, DesktopSidebar, FloatingSidebarControls } from '@/app/AppSidebar'
 import { useAppShell } from '@/app/useAppShell'
@@ -91,6 +94,12 @@ function App() {
 
       {isMailView ? (
         <SearchMailDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      ) : isTodoView ? (
+        <SearchTasksDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      ) : isGoalView ? (
+        <SearchGoalsDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
+      ) : isAnalysisView ? (
+        <SearchAnalysisDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       ) : (
         <SearchEventsDialog open={isSearchOpen} onOpenChange={setIsSearchOpen} />
       )}

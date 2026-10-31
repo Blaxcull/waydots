@@ -8,11 +8,11 @@ import { getGoalIcon, type Goal } from "./goal";
 import { useGoalsStore } from "@/store/goalsStore";
 import { useEventsStore } from "@/store/eventsStore";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import SearchIcon from "@/assets/search.svg";
 import { MailTodoPill } from "@/components/MailTodoPill";
+import { SearchGoalsDialog } from "./SearchGoalsDialog";
 import type { ColumnType, DragState, SearchGoalResult, TodoItem, TodoStore } from "./goalView.types";
-import { getBucketLabel, getColumnTypeFromBucketKey, getKey, parseBucketDate, slideVariants } from "./goalView.utils";
+import { getKey, parseBucketDate, slideVariants } from "./goalView.utils";
 import { useSubscription } from "@/hooks/useSubscription";
 
 interface GoalColumnProps {
@@ -442,7 +442,6 @@ const GoalView = () => {
   const [sidebarItemData, setSidebarItemData] = useState<{ notes?: string; color?: string; icon?: string; targetValue?: number; targetPeriod?: Goal["targetPeriod"]; status?: Goal["status"] }>({});
   const [dragState, setDragState] = useState<DragState | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   
   const store = useGoalsStore((state) => state.store) as TodoStore;
   const fetchAllGoals = useGoalsStore((state) => state.fetchAllGoals);
@@ -507,88 +506,6 @@ const GoalView = () => {
     year: getKey("year", yearDate),
     life: "life",
   };
-
-  const columnPriority: Record<ColumnType, number> = {
-    week: 0,
-    month: 1,
-    year: 2,
-    life: 3,
-  };
-
-  const searchableGoals: SearchGoalResult[] = Object.entries(store).flatMap(([bucketKey, items]) => {
-    const columnType = getColumnTypeFromBucketKey(bucketKey) as ColumnType | null;
-    if (!columnType) return [];
-
-    return items.map((item) => ({
-      id: item.id,
-      text: item.text,
-      notes: item.notes ?? "",
-      color: item.color,
-      icon: item.icon,
-      targetValue: item.targetValue,
-      targetPeriod: item.targetPeriod,
-      status: item.status,
-      completed: item.completed,
-      columnType,
-      bucketKey,
-      bucketLabel: getBucketLabel(columnType, bucketKey),
-    }));
-  });
-
-  const filteredGoals = (() => {
-    const baseResults = searchableGoals
-      .map((item) => ({
-        ...item,
-        textRank: 999,
-        isCurrentBucket: item.bucketKey === currentBucketKeys[item.columnType] ? 0 : 1,
-      }))
-      .sort((a, b) =>
-        a.isCurrentBucket - b.isCurrentBucket ||
-        columnPriority[a.columnType] - columnPriority[b.columnType] ||
-        a.text.localeCompare(b.text)
-      );
-
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return baseResults.slice(0, 3);
-
-    const matched = searchableGoals
-      .map((item) => {
-        const statusLabel = (item.completed ? "completed" : item.status || "active").toLowerCase();
-        const columnLabel = item.columnType.toLowerCase();
-        const bucketLabel = item.bucketLabel.toLowerCase();
-
-        let textRank = -1;
-        if (item.text.toLowerCase() === query) textRank = 0;
-        else if (item.text.toLowerCase().startsWith(query)) textRank = 1;
-        else if (item.text.toLowerCase().includes(query)) textRank = 2;
-        else if (item.notes.toLowerCase().includes(query)) textRank = 3;
-        else if (columnLabel === query) textRank = 4;
-        else if (columnLabel.includes(query)) textRank = 5;
-        else if (bucketLabel.includes(query)) textRank = 6;
-        else if (statusLabel === query) textRank = 7;
-        else if (statusLabel.includes(query)) textRank = 8;
-
-        return {
-          ...item,
-          textRank,
-          isCurrentBucket: item.bucketKey === currentBucketKeys[item.columnType] ? 0 : 1,
-        };
-      })
-      .filter((item) => item.textRank !== -1)
-      .sort((a, b) =>
-        a.isCurrentBucket - b.isCurrentBucket ||
-        columnPriority[a.columnType] - columnPriority[b.columnType] ||
-        a.textRank - b.textRank ||
-        a.text.localeCompare(b.text)
-      )
-      .slice(0, 3);
-
-    if (matched.length >= 3) return matched;
-
-    const usedIds = new Set(matched.map((item) => item.id));
-    const filler = baseResults.filter((item) => !usedIds.has(item.id)).slice(0, 3 - matched.length);
-    return [...matched, ...filler];
-  })();
 
   const openSearchResult = (goal: SearchGoalResult) => {
     const bucketDate = parseBucketDate(goal.bucketKey);
@@ -804,76 +721,11 @@ const GoalView = () => {
         </div>
       </div>
       <GoalSidebar isOpen={sidebarOpen} onToggle={() => setSidebarOpen(!sidebarOpen)} prefillName={sidebarPrefillName} prefillNotes={sidebarItemData.notes} prefillColor={sidebarItemData.color} prefillIcon={sidebarItemData.icon} prefillTargetValue={sidebarItemData.targetValue} prefillTargetPeriod={sidebarItemData.targetPeriod} prefillStatus={sidebarItemData.status} columnType={sidebarColumnType} isPro={isPro} onSave={handleSidebarSave} onClearPrefill={() => { setSidebarItemId(""); setSidebarPrefillName(""); setSidebarColumnType(null); setSidebarItemData({}); }} />
-      <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <DialogContent className="w-[min(680px,92vw)] overflow-hidden rounded-[28px] border border-gray-200 bg-neutral-100 p-0 shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
-          <div className="border-b border-gray-200 px-5 py-4">
-            <div className="flex items-center gap-3 rounded-[24px] border border-gray-200 bg-[#e7e7e6] px-4 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dddddc]">
-                <img src={SearchIcon} alt="" className="h-5 w-5 opacity-60" />
-              </div>
-              <input
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && filteredGoals.length > 0) {
-                    e.preventDefault();
-                    openSearchResult(filteredGoals[0]);
-                  }
-                }}
-                placeholder="Search Goals"
-                className="w-full bg-transparent text-2xl font-semibold text-neutral-700 outline-none placeholder:text-neutral-400"
-              />
-            </div>
-          </div>
-          <div className="max-h-[420px] overflow-y-auto no-scrollbar px-3 py-3">
-            {filteredGoals.length > 0 ? (
-              <div className="space-y-2">
-                {filteredGoals.map((goal) => (
-                  (() => {
-                    const showBucketLabel = goal.columnType !== "life";
-                    return (
-                  <button
-                    key={`${goal.bucketKey}-${goal.id}`}
-                    type="button"
-                    onClick={() => openSearchResult(goal)}
-                    className="group flex w-full items-start justify-between rounded-[24px] border border-transparent bg-[#ececeb] px-4 py-3 text-left transition-all duration-200 hover:border-gray-200 hover:bg-[#f3f3f2]"
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-[17px] font-semibold text-neutral-800">{goal.text}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm font-medium text-neutral-500">
-                        <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
-                          {goal.columnType}
-                        </span>
-                        {showBucketLabel ? (
-                          <span className="rounded-full bg-white px-2.5 py-1">
-                            {goal.bucketLabel}
-                          </span>
-                        ) : null}
-                        <span className="rounded-full bg-white px-2.5 py-1">
-                          {goal.completed ? "completed" : goal.status || "active"}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="ml-4 flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-full bg-white text-xl font-semibold leading-none text-neutral-300 transition-colors duration-200 group-hover:text-neutral-500">
-                      &gt;
-                    </div>
-                  </button>
-                    )
-                  })()
-                ))}
-              </div>
-            ) : (
-              <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-dashed border-gray-200 bg-[#ececeb] text-center">
-                <div>
-                  <p className="text-base font-semibold text-neutral-500">No matching goals</p>
-                  <p className="mt-1 text-sm text-neutral-400">Try a goal title or note.</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <SearchGoalsDialog
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
+        onSelectGoal={openSearchResult}
+      />
     </div>
   );
 }

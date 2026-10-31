@@ -31,7 +31,7 @@ export function SearchMailDialog({ open, onOpenChange }: SearchMailDialogProps) 
         return matchSubject || matchSender || matchEmail || matchBody
       })
 
-    return base.slice(0, 3)
+    return base.slice(0, 15)
   }, [emails, localQuery])
 
   const handleSelect = (email: Email) => {
@@ -74,24 +74,32 @@ export function SearchMailDialog({ open, onOpenChange }: SearchMailDialogProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(680px,92vw)] overflow-hidden rounded-[28px] border border-gray-200 bg-neutral-100 p-0 shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
         {/* Search Input Header */}
-              <div className="border-b border-gray-200 px-4 sm:px-5 py-3 sm:py-4">
-                <div className="flex items-center gap-2.5 sm:gap-3 rounded-[24px] border border-gray-200 bg-[#e7e7e6] px-3.5 sm:px-4 py-2.5 sm:py-3">
-                  <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-[#dddddc]">
-                    <img src={SearchIcon} alt="" className="h-4 w-4 sm:h-5 sm:w-5 opacity-60" />
-                  </div>
-                  <input
-                    autoFocus
-                    value={localQuery}
-                    onChange={(e) => setLocalQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && matchedEmails.length > 0) {
-                        e.preventDefault()
-                        handleSelect(matchedEmails[0])
-                      }
-                    }}
-                    placeholder="Search Mail"
-                    className="w-full bg-transparent text-xl sm:text-2xl font-semibold text-neutral-700 outline-none placeholder:text-neutral-400"
-                  />
+        <div className="border-b border-gray-200 px-4 sm:px-5 py-3 sm:py-4">
+          <div className="mb-2.5 flex items-center justify-between">
+            <span className="rounded-full bg-neutral-200/80 px-2.5 py-0.5 text-xs font-semibold tracking-wider text-neutral-600 uppercase">
+              Mail Page • Inbox &amp; Messages
+            </span>
+            <span className="text-xs text-neutral-400">
+              {localQuery ? `${matchedEmails.length} match${matchedEmails.length === 1 ? "" : "es"}` : `${emails.length} emails on page`}
+            </span>
+          </div>
+          <div className="flex items-center gap-2.5 sm:gap-3 rounded-[24px] border border-gray-200 bg-[#e7e7e6] px-3.5 sm:px-4 py-2.5 sm:py-3">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full bg-[#dddddc]">
+              <img src={SearchIcon} alt="" className="h-4 w-4 sm:h-5 sm:w-5 opacity-60" />
+            </div>
+            <input
+              autoFocus
+              value={localQuery}
+              onChange={(e) => setLocalQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && matchedEmails.length > 0) {
+                  e.preventDefault()
+                  handleSelect(matchedEmails[0])
+                }
+              }}
+              placeholder="Search Mail on this page..."
+              className="w-full bg-transparent text-xl sm:text-2xl font-semibold text-neutral-700 outline-none placeholder:text-neutral-400"
+            />
                   {localQuery && (
                     <button
                       type="button"

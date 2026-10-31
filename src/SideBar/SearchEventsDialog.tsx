@@ -42,12 +42,80 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
   const goalsStore = useGoalsStore((state) => state.store)
   const [searchQuery, setSearchQuery] = React.useState("")
 
+  // Determine active date from URL or timeStore
+  const activeDate = React.useMemo(() => {
+    const match = location.pathname.match(/\/(day|week|month|year)\/(\d{4})\/(\d{1,2})\/(\d{1,2})/)
+    if (match) {
+      const y = parseInt(match[2], 10)
+      const m = parseInt(match[3], 10) - 1
+      const d = parseInt(match[4], 10)
+      const date = new Date(y, m, d)
+      if (!Number.isNaN(date.getTime())) return date
+    }
+    return selectedDate ? new Date(selectedDate) : new Date()
+  }, [location.pathname, selectedDate])
+
+  // Compute exact bounds for the current page's calendar cycle
+  const { cycleStartStr, cycleEndStr, cycleBadge, searchPlaceholder, emptyMessage } = React.useMemo(() => {
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const toYMD = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+
+    if (currentCalendarView === "day") {
+      const ymd = toYMD(activeDate)
+      const dayLabel = activeDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+      return {
+        cycleStartStr: ymd,
+        cycleEndStr: ymd,
+        cycleBadge: `Day • ${dayLabel}`,
+        searchPlaceholder: `Search events on ${dayLabel}...`,
+        emptyMessage: `No events scheduled for this day (${dayLabel}).`,
+      }
+    }
+
+    if (currentCalendarView === "week") {
+      const start = new Date(activeDate)
+      start.setDate(activeDate.getDate() - activeDate.getDay()) // Sunday
+      const end = new Date(start)
+      end.setDate(start.getDate() + 6) // Saturday
+      const startStr = toYMD(start)
+      const endStr = toYMD(end)
+      const weekLabel = `${start.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${end.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+      return {
+        cycleStartStr: startStr,
+        cycleEndStr: endStr,
+        cycleBadge: `Week • ${weekLabel}`,
+        searchPlaceholder: `Search this week's events (${weekLabel})...`,
+        emptyMessage: `No events scheduled for this week (${weekLabel}).`,
+      }
+    }
+
+    if (currentCalendarView === "month") {
+      const year = activeDate.getFullYear()
+      const month = activeDate.getMonth()
+      const start = new Date(year, month, 1)
+      const end = new Date(year, month + 1, 0)
+      const monthLabel = activeDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+      return {
+        cycleStartStr: toYMD(start),
+        cycleEndStr: toYMD(end),
+        cycleBadge: `Month • ${monthLabel}`,
+        searchPlaceholder: `Search ${monthLabel} events...`,
+        emptyMessage: `No events scheduled for ${monthLabel}.`,
+      }
+    }
+
+    // year view
+    const year = activeDate.getFullYear()
+    return {
+      cycleStartStr: `${year}-01-01`,
+      cycleEndStr: `${year}-12-31`,
+      cycleBadge: `Year • ${year}`,
+      searchPlaceholder: `Search ${year} events...`,
+      emptyMessage: `No events scheduled for the year ${year}.`,
+    }
+  }, [activeDate, currentCalendarView])
+
   const searchableEvents = React.useMemo(() => {
-    const selectedDateStr = selectedDate
-      ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, "0")}-${String(selectedDate.getDate()).padStart(2, "0")}`
-      : null
-    const selectedMonthKey = selectedDateStr?.slice(0, 7) ?? null
-    const selectedYear = selectedDateStr?.slice(0, 4) ?? null
     const eventMap = new Map<string, {
       id: string
       title: string
@@ -81,36 +149,47 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
       if (!eventDate) return
 
       const endDate = typeof event.end_date === "string" ? event.end_date : eventDate
+
+      // Strict Calendar Cycle Boundary Check:
+      // An event belongs to this page only if it overlaps with [cycleStartStr, cycleEndStr]
+      if (eventDate > cycleEndStr || endDate < cycleStartStr) {
+        return
+      }
+
       const isAllDay = isAllDayEvent(event)
       const isMultiDay = isMultiDayEvent(event)
       const isTimedMultiDay = isTimedMultiDayEvent(event)
       const isRecurring = !!event.isRecurringInstance || !!(event.repeat && event.repeat !== "None")
 
-      let bucketPriority = 5
-      let bucketLabel = "Other events"
-      if (isRecurring) {
-        bucketPriority = 2
-        bucketLabel = "Repeat"
-      } else if (selectedDateStr && eventDate === selectedDateStr && isMultiDay) {
-        bucketPriority = 1
-        bucketLabel = "Multi Day"
-      } else if (selectedDateStr && eventDate === selectedDateStr && !isAllDay) {
-        bucketPriority = 0
-        bucketLabel = "Current day"
-      } else if (selectedDateStr && eventDate === selectedDateStr && isAllDay) {
-        bucketPriority = 2
-        bucketLabel = "All Day"
-      } else if (selectedMonthKey && eventDate.slice(0, 7) === selectedMonthKey) {
-        bucketPriority = 3
-        bucketLabel = "This month"
-      } else if (selectedYear && eventDate.slice(0, 4) === selectedYear) {
-        bucketPriority = 4
-        bucketLabel = "This year"
+      let bucketPriority = 3
+      let bucketLabel = formatShortDate(eventDate)
+
+      if (currentCalendarView === "day") {
+        if (isRecurring) {
+          bucketPriority = 1
+          bucketLabel = "Recurring"
+        } else if (isAllDay || isMultiDay) {
+          bucketPriority = 1
+          bucketLabel = "All Day"
+        } else {
+          bucketPriority = 0
+          bucketLabel = "Today"
+        }
+      } else if (currentCalendarView === "week") {
+        const eventD = new Date(`${eventDate}T00:00:00`)
+        bucketLabel = eventD.toLocaleDateString("en-US", { weekday: "short", month: "numeric", day: "numeric" })
+        bucketPriority = eventDate.localeCompare(cycleStartStr)
+      } else if (currentCalendarView === "month") {
+        bucketLabel = formatShortDate(eventDate)
+        bucketPriority = parseInt(eventDate.slice(8, 10), 10) || 0
+      } else {
+        const eventD = new Date(`${eventDate}T00:00:00`)
+        bucketLabel = eventD.toLocaleDateString("en-US", { month: "short" })
+        bucketPriority = eventD.getMonth()
       }
 
-      const key = isRecurring ? `${(event as any).seriesMasterId || event.id}-repeat` : `${event.id}`
-      const existing = eventMap.get(key)
-      if (existing && existing.bucketPriority <= bucketPriority) return
+      const key = `${event.id}_${eventDate}`
+      if (eventMap.has(key)) return
 
       eventMap.set(key, {
         id: event.id,
@@ -133,26 +212,31 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
       })
     }
 
+    // Only inspect relevant cached days for computed and direct events
     for (const events of Object.values(eventsCache)) events.forEach(addEntry)
     for (const events of Object.values(computedEventsCache)) events.forEach(addEntry)
+
     return Array.from(eventMap.values())
-  }, [computedEventsCache, eventsCache, goalsStore, selectedDate])
+  }, [computedEventsCache, currentCalendarView, cycleEndStr, cycleStartStr, eventsCache, goalsStore])
 
   const filteredEvents = React.useMemo(() => {
-    const baseResults = [...searchableEvents]
-      .sort((a, b) => a.bucketPriority - b.bucketPriority || a.date.localeCompare(b.date) || a.title.localeCompare(b.title))
+    const baseResults = [...searchableEvents].sort((a, b) =>
+      a.date.localeCompare(b.date) || a.bucketPriority - b.bucketPriority || a.title.localeCompare(b.title)
+    )
 
     const query = searchQuery.trim().toLowerCase()
-    if (!query) return baseResults.slice(0, 3)
+    if (!query) {
+      // Empty query shows up to 10 events belonging to this calendar cycle
+      return baseResults.slice(0, 10)
+    }
 
-    const matched = searchableEvents
+    return searchableEvents
       .map((entry) => {
         const title = entry.title.toLowerCase()
         const notes = entry.notes.toLowerCase()
         const location = entry.location.toLowerCase()
         const bucketLabel = entry.bucketLabel.toLowerCase()
         const dateRangeLabel = entry.dateRangeLabel.toLowerCase()
-        const multiDayLabel = entry.isMultiDay ? "multi day" : ""
 
         let textRank = -1
         if (title === query) textRank = 0
@@ -162,24 +246,15 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
         else if (notes.includes(query)) textRank = 4
         else if (bucketLabel.includes(query)) textRank = 5
         else if (dateRangeLabel.includes(query)) textRank = 6
-        else if (multiDayLabel.includes(query)) textRank = 7
 
         return { ...entry, textRank }
       })
       .filter((entry) => entry.textRank !== -1)
       .sort((a, b) =>
-        a.bucketPriority - b.bucketPriority ||
         a.textRank - b.textRank ||
         a.date.localeCompare(b.date) ||
         a.title.localeCompare(b.title)
       )
-      .slice(0, 3)
-
-    if (matched.length >= 3) return matched
-
-    const usedIds = new Set(matched.map((entry) => entry.id))
-    const filler = baseResults.filter((entry) => !usedIds.has(entry.id)).slice(0, 3 - matched.length)
-    return [...matched, ...filler]
   }, [searchQuery, searchableEvents])
 
   const openSearchResult = React.useCallback((eventId: string, dateStr: string) => {
@@ -213,6 +288,14 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(680px,92vw)] overflow-hidden rounded-[28px] border border-gray-200 bg-neutral-100 p-0 shadow-[0_24px_70px_rgba(0,0,0,0.14)]">
         <div className="border-b border-gray-200 px-5 py-4">
+          <div className="mb-2.5 flex items-center justify-between">
+            <span className="rounded-full bg-neutral-200/80 px-2.5 py-0.5 text-xs font-semibold tracking-wider text-neutral-600 uppercase">
+              {cycleBadge}
+            </span>
+            <span className="text-xs text-neutral-400">
+              {searchQuery ? `${filteredEvents.length} match${filteredEvents.length === 1 ? "" : "es"}` : `${searchableEvents.length} event${searchableEvents.length === 1 ? "" : "s"} on page`}
+            </span>
+          </div>
           <div className="flex items-center gap-3 rounded-[24px] border border-gray-200 bg-[#e7e7e6] px-4 py-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#dddddc]">
               <img src={SearchIcon} alt="" className="h-5 w-5 opacity-60" />
@@ -228,9 +311,19 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
                   openSearchResult(first.id, first.date)
                 }
               }}
-              placeholder="Search Events"
-              className="w-full bg-transparent text-2xl font-semibold text-neutral-700 outline-none placeholder:text-neutral-400"
+              placeholder={searchPlaceholder}
+              className="w-full bg-transparent text-xl sm:text-2xl font-semibold text-neutral-700 outline-none placeholder:text-neutral-400"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="rounded-full p-1 text-neutral-400 hover:bg-black/5 hover:text-neutral-600"
+                aria-label="Clear search"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
         <div className="max-h-[420px] overflow-y-auto px-3 py-3">
@@ -288,10 +381,14 @@ export function SearchEventsDialog({ open, onOpenChange }: SearchEventsDialogPro
               })}
             </div>
           ) : (
-            <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-dashed border-gray-200 bg-[#ececeb] text-center">
+            <div className="flex min-h-[180px] items-center justify-center rounded-[24px] border border-dashed border-gray-200 bg-[#ececeb] p-6 text-center">
               <div>
-                <p className="text-base font-semibold text-neutral-500">No matching events</p>
-                <p className="mt-1 text-sm text-neutral-400">Try a title, place, or repeat event name.</p>
+                <p className="text-base font-semibold text-neutral-600">
+                  {searchQuery ? `No matching events found on this ${currentCalendarView}` : emptyMessage}
+                </p>
+                <p className="mt-1 text-sm text-neutral-400">
+                  {searchQuery ? "Try searching for a different title or location." : "Only events occurring within this calendar page cycle appear here."}
+                </p>
               </div>
             </div>
           )}
