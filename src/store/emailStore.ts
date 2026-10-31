@@ -522,6 +522,7 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
       const targetEmail = state.emails.find((e) => e.id === emailId)
       if (!targetEmail) return state
 
+      const threadId = targetEmail.threadId || targetEmail.id
       const sentEmail: Email = {
         id: `email-sent-${Date.now()}`,
         subject: targetEmail.subject.startsWith("Re: ")
@@ -537,15 +538,16 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         isDraft: false,
         isSent: true,
         priority: targetEmail.priority,
+        threadId,
       }
 
       const updatedEmails = state.emails.map((e) =>
         e.id === emailId
           ? {
               ...e,
+              threadId,
               unread: false,
               aiDraft: undefined,
-              body: `${e.body}\n\n--- Sent Reply (${state.senderAccount}) ---\n${replyText}`,
             }
           : e
       )

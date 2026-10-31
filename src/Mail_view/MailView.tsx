@@ -765,6 +765,62 @@ export default function MailView() {
   const selectedEmail =
     selectedEmailId !== null ? emails.find((e) => e.id === selectedEmailId) || null : null
 
+  // Thread conversation messages (original + sent replies + incoming follow-ups) like Gmail
+  const threadMessages = useMemo(() => {
+    if (!selectedEmail) return []
+    if (selectedEmail.isDraft) return [selectedEmail]
+
+    const cleanSubject = (s: string) =>
+      s.replace(/^(re:\s*|fwd:\s*)+/i, "").trim().toLowerCase()
+
+    const targetSubject = cleanSubject(selectedEmail.subject)
+    const targetSender = selectedEmail.senderEmail.toLowerCase()
+    const targetRecipient = (selectedEmail.recipientEmail || "").toLowerCase()
+
+    const related = emails.filter((e) => {
+      if (e.id === selectedEmail.id) return false
+      if (e.isDraft || e.isTrash) return false
+
+      // Match by threadId
+      if (selectedEmail.threadId && e.threadId && e.threadId === selectedEmail.threadId) {
+        return true
+      }
+
+      // Match by sent email replying to this email / thread
+      if (e.isSent || e.senderName === "You" || e.id.startsWith("email-sent-")) {
+        if (e.threadId === selectedEmail.id || (selectedEmail.threadId && e.threadId === selectedEmail.threadId)) {
+          return true
+        }
+        const isRecipientMatch =
+          e.recipientEmail.toLowerCase() === targetSender ||
+          (targetRecipient && e.recipientEmail.toLowerCase() === targetRecipient)
+        if (isRecipientMatch && cleanSubject(e.subject) === targetSubject) {
+          return true
+        }
+      }
+
+      // Match by incoming reply
+      if (cleanSubject(e.subject) === targetSubject) {
+        const isParticipantMatch =
+          (e.senderEmail.toLowerCase() === targetSender && (!targetRecipient || e.recipientEmail.toLowerCase() === targetRecipient)) ||
+          (e.senderEmail.toLowerCase() === targetRecipient && e.recipientEmail.toLowerCase() === targetSender)
+        if (isParticipantMatch) {
+          return true
+        }
+      }
+
+      return false
+    })
+
+    // Chronological order: incoming original first, then sent messages/replies
+    const all = [selectedEmail, ...related]
+    return all.sort((a, b) => {
+      if (!a.isSent && b.isSent) return -1
+      if (a.isSent && !b.isSent) return 1
+      return 0
+    })
+  }, [selectedEmail, emails])
+
   // Selection states
   const allDisplayedSelected =
     displayedEmails.length > 0 &&
@@ -2398,12 +2454,65 @@ export default function MailView() {
               <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 md:px-8 py-5">
                 <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
 
-                {/* Email Content Body (Rich HTML or Typographic Text, hidden for drafts to maximize typing responsiveness) */}
+                {/* Email Thread Conversation (original message + sent email replies like Gmail) */}
                 {!selectedEmail.isDraft && (
-                  <EmailHtmlViewer
-                    html={selectedEmail.htmlBody}
-                    plainText={selectedEmail.body}
-                  />
+                  <div className="flex flex-col gap-4">
+                    {threadMessages.map((msg) => {
+                      const isMe = msg.isSent || msg.senderName === "You" || msg.senderEmail === senderAccount
+
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`rounded-2xl border transition-all ${
+                            isMe
+                              ? "border-gray-200/90 bg-neutral-50/70 p-5 shadow-xs flex flex-col gap-3"
+                              : "border-gray-200/90 bg-white p-5 shadow-xs flex flex-col gap-3"
+                          }`}
+                        >
+                          {/* Message Header inside card */}
+                          <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`flex h-9 w-9 items-center justify-center rounded-full font-bold text-xs shrink-0 shadow-2xs ${
+                                  isMe
+                                    ? "bg-neutral-900 text-white"
+                                    : "bg-[#dedddc] border border-white/60 text-neutral-700"
+                                }`}
+                              >
+                                {isMe ? "Y" : msg.senderName.charAt(0)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold text-neutral-900 truncate">
+                                    {isMe ? "You" : msg.senderName}
+                                  </span>
+                                  {isMe && (
+                                    <span className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 text-[10px] font-semibold">
+                                      Sent
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-neutral-500 truncate">
+                                  To: {msg.recipientEmail || (isMe ? selectedEmail.senderEmail : selectedEmail.recipientEmail)}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="text-xs font-medium text-neutral-400 tabular-nums shrink-0">
+                              {msg.timestamp}
+                            </div>
+                          </div>
+
+                          {/* Message Body Content */}
+                          <div className="pt-1">
+                            <EmailHtmlViewer
+                              html={msg.htmlBody}
+                              plainText={msg.body.replace(/\n\n--- Sent Reply \([^)]+\) ---[\s\S]*$/, "").trim()}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
                 )}
 
                 {/* If Selected Email is a Draft: Show Send Draft Action & Editable Box */}
@@ -2448,7 +2557,7 @@ export default function MailView() {
           </div>
 
           {/* RIGHT COLUMN: Mailbox Overview List */}
-            <div className="hidden md:flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-l border-gray-200/80 bg-white">
+            <div className="hidden md:flex w-full md:w-[480px] lg:w-[520px] xl:w-[560px] shrink-0 flex-col border-l border-gray-200/80 bg-white">
               {/* Header with expand to full page button */}
               <div className="flex items-center justify-between border-b border-gray-200/80 px-4 py-3 bg-white">
                 <div className="flex items-center gap-2">

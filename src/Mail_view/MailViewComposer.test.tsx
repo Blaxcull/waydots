@@ -393,4 +393,46 @@ describe("MailView Composer & Header Layout", () => {
     fireEvent.click(connectBtn)
     expect(connectGmailAccount).toHaveBeenCalled()
   })
+
+  it("displays sent replies directly in the thread conversation like in Gmail", async () => {
+    const store = useEmailStore.getState()
+    const threadEmail: any = {
+      id: "email-thread-original",
+      subject: "Meeting",
+      senderName: "Akash",
+      senderEmail: "akashsharma27062004@gmail.com",
+      recipientEmail: "you@waydots.com",
+      body: "Tommorow meeting at 10 am",
+      timestamp: "10:06 AM",
+      unread: false,
+      starred: false,
+      priority: "high",
+      threadId: "thread-akash-meeting",
+    }
+    const sentReply: any = {
+      id: "email-sent-reply-1",
+      subject: "Re: Meeting",
+      senderName: "You",
+      senderEmail: "you@waydots.com",
+      recipientEmail: "akashsharma27062004@gmail.com",
+      body: "I can make it at 10 AM tomorrow.",
+      timestamp: "10:15 AM",
+      unread: false,
+      isSent: true,
+      priority: "high",
+      threadId: "thread-akash-meeting",
+    }
+
+    store.setEmails([threadEmail, sentReply, ...store.emails])
+    store.selectEmail(threadEmail.id)
+
+    render(<MailView />)
+
+    // Original message body
+    expect(screen.getAllByText("Tommorow meeting at 10 am").length).toBeGreaterThanOrEqual(1)
+
+    // Sent message body rendered in the thread
+    expect(screen.getByText("I can make it at 10 AM tomorrow.")).toBeInTheDocument()
+    expect(screen.getByText("Sent")).toBeInTheDocument()
+  })
 })
