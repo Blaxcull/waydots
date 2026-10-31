@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Plus, Calendar, Trash2, ListChecks, Check, Sun, Flag, X } from "lucide-react";
+import { Plus, Calendar, Trash2, ListChecks, Check, Sun, Flag } from "lucide-react";
 import { format } from "date-fns";
 import { useTasksStore, type TaskItem } from "@/store/tasksStore";
 import { TaskSidebar } from "./TaskSidebar";
@@ -560,41 +560,29 @@ export default function TaskView() {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-20 sm:bottom-6 left-4 sm:left-6 z-50 flex items-center gap-2.5 sm:gap-3 rounded-full bg-[#18181b]/95 text-white pl-3.5 pr-2.5 py-2 sm:py-2.5 shadow-[0_16px_40px_rgba(0,0,0,0.28)] border border-white/10 backdrop-blur-xl transition-all animate-in fade-in slide-in-from-bottom-3 duration-200 select-none"
+          className="fixed bottom-20 sm:bottom-6 left-4 sm:left-6 z-50 flex items-center gap-3.5 rounded-full bg-white/95 text-neutral-800 pl-4 pr-3 py-3 shadow-[0_16px_45px_rgba(0,0,0,0.12),0_4px_12px_rgba(0,0,0,0.05)] border border-black/[0.08] backdrop-blur-xl transition-all animate-in fade-in slide-in-from-bottom-3 duration-200 select-none"
         >
-          <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
-            <Check className="h-3 w-3 stroke-[2.5]" />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-red-500 text-white shadow-sm shadow-red-500/25">
+            <Check className="h-4 w-4 stroke-[3]" />
           </div>
 
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-neutral-400 font-medium">Completed</span>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-neutral-500 font-medium">Completed</span>
             {completedToast.title && (
-              <span className="font-semibold text-neutral-100 max-w-[160px] sm:max-w-[240px] truncate">
+              <span className="font-semibold text-neutral-900 max-w-[200px] sm:max-w-[320px] truncate">
                 &ldquo;{completedToast.title}&rdquo;
               </span>
             )}
           </div>
 
-          <div className="h-3.5 w-px bg-white/15 mx-0.5" />
+          <div className="h-4 w-px bg-neutral-200 mx-0.5" />
 
           <button
             type="button"
             onClick={handleUndoComplete}
-            className="cursor-pointer text-xs font-semibold text-neutral-200 hover:text-white px-2.5 py-1 rounded-full hover:bg-white/10 active:scale-95 transition-all"
+            className="cursor-pointer text-xs sm:text-sm font-semibold text-neutral-700 hover:text-neutral-950 px-3 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200/80 active:scale-95 transition-all shadow-xs"
           >
             Undo
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-              setCompletedToast(null);
-            }}
-            aria-label="Dismiss notification"
-            className="p-1 text-neutral-400 hover:text-neutral-200 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-          >
-            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       )}

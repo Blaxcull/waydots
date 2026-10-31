@@ -88,7 +88,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 <Button
                   onClick={() => setActiveFolder(tab.id)}
                   className={cn(
-                    "w-auto px-3.5 py-1.5 text-xs sm:w-[120px] sm:py-6 sm:text-xl font-semibold capitalize",
+                    "rounded-full w-auto px-3.5 py-1.5 text-xs sm:w-[120px] sm:py-6 sm:text-xl font-semibold capitalize",
                     "transition-all duration-200 ease-out",
                     "bg-transparent text-neutral-600",
                     "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
@@ -129,7 +129,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
                 <Button
                   onClick={() => setActiveTaskView(tab)}
                   className={cn(
-                    "w-auto px-3.5 py-1.5 text-xs sm:w-[125px] sm:py-6 sm:text-xl font-semibold capitalize",
+                    "rounded-full w-auto px-3.5 py-1.5 text-xs sm:w-[125px] sm:py-6 sm:text-xl font-semibold capitalize",
                     "transition-all duration-200 ease-out",
                     "bg-transparent text-neutral-600",
                     "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
@@ -168,7 +168,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
               <Button
                 onClick={() => handleViewClick(view)}
                 className={cn(
-                  "w-auto px-3.5 py-1.5 text-xs sm:w-[120px] sm:py-6 sm:text-xl font-semibold capitalize",
+                  "rounded-full w-auto px-3.5 py-1.5 text-xs sm:w-[120px] sm:py-6 sm:text-xl font-semibold capitalize",
                   "transition-all duration-200 ease-out",
                   "bg-transparent text-neutral-600",
                   "hover:bg-[#e3e3e1] hover:scale-105 active:scale-95",
