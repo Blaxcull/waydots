@@ -528,7 +528,25 @@ Rules:
   }
 
   // Fast intelligent offline heuristics that preserve actual email content
-  const lower = userInstruction.toLowerCase()
+  let customRequest = ""
+  let toneInstruction = userInstruction
+  if (userInstruction.includes("Maintain tone and style:")) {
+    const parts = userInstruction.split("Maintain tone and style:")
+    customRequest = parts[0].replace(/\.\s*$/, "").trim()
+    toneInstruction = parts[1].trim()
+  }
+
+  let workingDraft = currentDraft
+  if (customRequest) {
+    const signoffRegex = /(Best regards,[\s\S]*$|Warm regards,[\s\S]*$|Cheers,[\s\S]*$|Sincerely,[\s\S]*$)/i
+    if (signoffRegex.test(workingDraft)) {
+      workingDraft = workingDraft.replace(signoffRegex, `${customRequest}\n\n$1`)
+    } else {
+      workingDraft = `${workingDraft}\n\n${customRequest}`
+    }
+  }
+
+  const lower = toneInstruction.toLowerCase()
   let firstName = email.senderName.split(" ")[0] || email.senderName
   if (
     firstName.toLowerCase() === "google" ||
@@ -539,7 +557,7 @@ Rules:
   }
 
   if (lower.includes("polite") || lower.includes("friendly") || lower.includes("warmer")) {
-    const bodyWithoutGreeting = currentDraft
+    const bodyWithoutGreeting = workingDraft
       .replace(/^Hi [^,\n]+,?\n*/i, "")
       .replace(/^Dear [^,\n]+,?\n*/i, "")
       .replace(/^Hey [^,\n]+,?\n*/i, "")
@@ -548,7 +566,7 @@ Rules:
   }
 
   if (lower.includes("concise") || lower.includes("brief") || lower.includes("short")) {
-    const paragraphs = currentDraft.split(/\n\s*\n/).filter(Boolean)
+    const paragraphs = workingDraft.split(/\n\s*\n/).filter(Boolean)
     const greeting = paragraphs[0]?.match(/^(Hi|Dear|Hey)\b/i) ? paragraphs[0] : `Hi ${firstName},`
     const lastP = paragraphs[paragraphs.length - 1] || ""
     const hasSignoff = /(regards|best|cheers|sincerely)/i.test(lastP)
@@ -566,7 +584,7 @@ Rules:
   }
 
   if (lower.includes("professional") || lower.includes("formal") || lower.includes("executive")) {
-    const bodyText = currentDraft
+    const bodyText = workingDraft
       .replace(/^Hi [^,\n]+,?\n*/i, "")
       .replace(/^Hey [^,\n]+,?\n*/i, "")
       .replace(/(Best regards,|Warm regards,|Cheers,|Sincerely,)[\s\S]*$/i, "")

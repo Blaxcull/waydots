@@ -89,6 +89,47 @@ describe("MailView Composer & Header Layout", () => {
     })
   })
 
+  it("keeps the clicked tone tag selected and preserves it when refining with a custom prompt", async () => {
+    const store = useEmailStore.getState()
+    const firstEmail = store.emails[0]
+    store.selectEmail(firstEmail.id)
+
+    render(<MailView />)
+
+    const politeBtn = screen.getByRole("button", { name: /More Polite/i })
+    fireEvent.click(politeBtn)
+
+    // Wait for the tone refinement to finish and verify polite button is selected
+    await waitFor(() => {
+      expect(politeBtn.className).toContain("bg-neutral-900")
+      expect(screen.getByRole("button", { name: /Update Draft/i })).toBeInTheDocument()
+    })
+
+    // Enter a custom modification in the prompt input
+    const promptInput = screen.getByPlaceholderText(/Add instructions/i)
+    fireEvent.change(promptInput, { target: { value: "Add request for slide deck" } })
+
+    // Click Update Draft
+    const updateBtn = screen.getByRole("button", { name: /Update Draft/i })
+    fireEvent.click(updateBtn)
+
+    // Wait for custom refinement to complete
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Update Draft/i })).toBeInTheDocument()
+    })
+
+    // Verify refineDraftWithAiPrompt was called with the combined instruction
+    const { refineDraftWithAiPrompt } = await import("@/services/geminiMailService")
+    expect(refineDraftWithAiPrompt).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.stringContaining("Maintain tone and style: Make the tone warmer, more polite, and express appreciation")
+    )
+
+    // Verify polite button stays selected after update
+    expect(politeBtn.className).toContain("bg-neutral-900")
+  })
+
   it("sends AI generated draft reply using the exact same send flow as manually written messages", async () => {
     const store = useEmailStore.getState()
     const emailToTest = store.emails[1] // Second email without initial draft

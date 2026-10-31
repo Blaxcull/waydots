@@ -121,6 +121,49 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
       Boolean(email.aiDraft.suggestedReply?.trim())
   )
 
+  const [selectedToneTag, setSelectedToneTag] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedToneTag(null)
+  }, [email.id])
+
+  const toneChips = useMemo(
+    () => [
+      { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
+      { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
+      { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
+      ...(email.meetingInfo?.hasMeeting
+        ? [
+            { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
+            { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
+          ]
+        : [
+            { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
+            { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
+          ]),
+    ],
+    [email.meetingInfo?.hasMeeting]
+  )
+
+  const handleChipClick = (chip: { label: string; prompt: string }) => {
+    if (selectedToneTag === chip.label) {
+      setSelectedToneTag(null)
+    } else {
+      setSelectedToneTag(chip.label)
+      onRefineWithPrompt(chip.prompt)
+    }
+  }
+
+  const handleUpdateDraft = () => {
+    const input = aiPromptInstruction.trim()
+    if (!input) return
+    const activeChip = toneChips.find((c) => c.label === selectedToneTag)
+    const combinedPrompt = activeChip
+      ? `${input}. Maintain tone and style: ${activeChip.prompt}`
+      : input
+    onRefineWithPrompt(combinedPrompt)
+  }
+
   return (
     <div className="mt-2 rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4 sm:p-5 shadow-xs flex flex-col gap-3.5">
       {/* Header: Reply-to Details and Generate AI Draft Button */}
@@ -271,30 +314,24 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
 
           {/* Quick prompt suggestion chips */}
           <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-            {[
-              { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
-              { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
-              { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
-              ...(email.meetingInfo?.hasMeeting
-                ? [
-                    { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
-                    { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
-                  ]
-                : [
-                    { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
-                    { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
-                  ]),
-            ].map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                disabled={isRefiningDraft}
-                onClick={() => onRefineWithPrompt(chip.prompt)}
-                className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {chip.label}
-              </button>
-            ))}
+            {toneChips.map((chip) => {
+              const isSelected = selectedToneTag === chip.label
+              return (
+                <button
+                  key={chip.label}
+                  type="button"
+                  disabled={isRefiningDraft}
+                  onClick={() => handleChipClick(chip)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-50 active:scale-95 flex items-center gap-1 ${
+                    isSelected
+                      ? "bg-neutral-900 text-white border border-neutral-900 shadow-xs ring-1 ring-neutral-900 font-semibold"
+                      : "border border-gray-300/90 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Custom Prompt Input & Refine Button */}
@@ -306,16 +343,20 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault()
-                  onRefineWithPrompt()
+                  handleUpdateDraft()
                 }
               }}
-              placeholder="Type prompt to change draft (e.g. 'Add request for slide deck', 'Sound more casual')..."
+              placeholder={
+                selectedToneTag
+                  ? `Add instructions (tone will stay in ${selectedToneTag.replace(/^[^\w\s]+\s*/, "")})...`
+                  : "Type prompt to change draft (e.g. 'Add request for slide deck', 'Sound more casual')..."
+              }
               className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
             />
             <button
               type="button"
               disabled={isRefiningDraft || !aiPromptInstruction.trim()}
-              onClick={() => onRefineWithPrompt()}
+              onClick={handleUpdateDraft}
               className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer shrink-0"
             >
               <Wand2 className={`h-3 w-3 ${isRefiningDraft ? "animate-spin" : ""}`} />
@@ -373,11 +414,40 @@ const DraftEditorForm = memo(function DraftEditorForm({
   const [recipient, setRecipient] = useState(email.recipientEmail || "")
   const [promptInput, setPromptInput] = useState("")
   const [isRefining, setIsRefining] = useState(false)
+  const [selectedToneTag, setSelectedToneTag] = useState<string | null>(null)
 
   useEffect(() => {
     setBody(email.body)
     setRecipient(email.recipientEmail || "")
+    setSelectedToneTag(null)
   }, [email.id, email.body, email.recipientEmail])
+
+  const draftToneChips = [
+    { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
+    { label: "⚡ Make Concise", prompt: "Make the draft concise, brief, and to the point" },
+    { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
+    { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
+    { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
+  ]
+
+  const handleChipClick = (chip: { label: string; prompt: string }) => {
+    if (selectedToneTag === chip.label) {
+      setSelectedToneTag(null)
+    } else {
+      setSelectedToneTag(chip.label)
+      handleRefine(chip.prompt)
+    }
+  }
+
+  const handleUpdateDraft = () => {
+    const input = promptInput.trim()
+    if (!input) return
+    const activeChip = draftToneChips.find((c) => c.label === selectedToneTag)
+    const combined = activeChip
+      ? `${input}. Maintain tone and style: ${activeChip.prompt}`
+      : input
+    handleRefine(combined)
+  }
 
   const handleRefine = async (instructionToUse?: string) => {
     const p = (instructionToUse || promptInput).trim()
@@ -449,23 +519,24 @@ const DraftEditorForm = memo(function DraftEditorForm({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-            {[
-              { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
-              { label: "⚡ Make Concise", prompt: "Make the draft concise, brief, and to the point" },
-              { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
-              { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
-              { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
-            ].map((chip) => (
-              <button
-                key={chip.label}
-                type="button"
-                disabled={isRefining}
-                onClick={() => handleRefine(chip.prompt)}
-                className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {chip.label}
-              </button>
-            ))}
+            {draftToneChips.map((chip) => {
+              const isSelected = selectedToneTag === chip.label
+              return (
+                <button
+                  key={chip.label}
+                  type="button"
+                  disabled={isRefining}
+                  onClick={() => handleChipClick(chip)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-all cursor-pointer disabled:opacity-50 active:scale-95 flex items-center gap-1 ${
+                    isSelected
+                      ? "bg-neutral-900 text-white border border-neutral-900 shadow-xs ring-1 ring-neutral-900 font-semibold"
+                      : "border border-gray-300/90 bg-white text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              )
+            })}
           </div>
 
           <div className="flex items-center gap-2">
@@ -476,16 +547,20 @@ const DraftEditorForm = memo(function DraftEditorForm({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault()
-                  handleRefine()
+                  handleUpdateDraft()
                 }
               }}
-              placeholder="Type prompt to modify draft..."
+              placeholder={
+                selectedToneTag
+                  ? `Add instructions (tone will stay in ${selectedToneTag.replace(/^[^\w\s]+\s*/, "")})...`
+                  : "Type prompt to modify draft..."
+              }
               className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
             />
             <button
               type="button"
               disabled={isRefining || !promptInput.trim()}
-              onClick={() => handleRefine()}
+              onClick={handleUpdateDraft}
               className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer shrink-0"
             >
               <Wand2 className={`h-3 w-3 ${isRefining ? "animate-spin" : ""}`} />
