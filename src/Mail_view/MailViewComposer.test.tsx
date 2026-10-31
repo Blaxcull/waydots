@@ -20,19 +20,23 @@ vi.mock("@/services/gmailApiService", () => ({
   batchModifyGmailMessages: vi.fn().mockResolvedValue({ success: true }),
 }))
 
-vi.mock("@/services/geminiMailService", () => ({
-  classifyAndSortEmailsWithGemini: vi.fn().mockImplementation((emails) => Promise.resolve({ emails, usedGemini: false })),
-  classifyEmailsWithKeywords: vi.fn().mockImplementation((emails) => emails),
-  sortEmailsByPriorityOrder: vi.fn().mockImplementation((emails) => emails),
-  refineDraftWithAiPrompt: vi.fn().mockResolvedValue("Refined draft content"),
-  generateContextualDraft: vi.fn().mockResolvedValue({
-    id: "draft-1",
-    emailId: "test-email-1",
-    suggestedReply: "AI generated contextual reply",
-    status: "pending_approval",
-  }),
-  syncMeetingAndRescheduleToCalendar: vi.fn().mockResolvedValue({ success: true }),
-}))
+vi.mock("@/services/geminiMailService", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/services/geminiMailService")>()
+  return {
+    ...actual,
+    classifyAndSortEmailsWithGemini: vi.fn().mockImplementation((emails) => Promise.resolve({ emails, usedGemini: false })),
+    classifyEmailsWithKeywords: vi.fn().mockImplementation((emails) => emails),
+    sortEmailsByPriorityOrder: vi.fn().mockImplementation((emails) => emails),
+    refineDraftWithAiPrompt: vi.fn().mockResolvedValue("Refined draft content"),
+    generateContextualDraft: vi.fn().mockResolvedValue({
+      id: "draft-1",
+      emailId: "test-email-1",
+      suggestedReply: "AI generated contextual reply",
+      status: "pending_approval",
+    }),
+    syncMeetingAndRescheduleToCalendar: vi.fn().mockResolvedValue({ success: true }),
+  }
+})
 
 afterEach(() => {
   cleanup()
@@ -237,6 +241,54 @@ describe("MailView Composer & Header Layout", () => {
     // Verify markGmailMessageAsRead was called immediately with the email id
     await waitFor(() => {
       expect(markGmailMessageAsRead).toHaveBeenCalledWith(targetEmail.id)
+    })
+  })
+
+  it("renders time/date toggle planner, checks conflicts, and sets event and to-do for meeting emails", async () => {
+    const store = useEmailStore.getState()
+    const meetingEmail: any = {
+      id: "email-akash-meeting",
+      subject: "Meeting",
+      senderName: "Akash",
+      senderEmail: "akashsharma27062004@gmail.com",
+      recipientEmail: "you@waydots.com",
+      body: "Tommorow meeting at 10 am",
+      timestamp: "10:06 AM",
+      unread: false,
+      priority: "high",
+    }
+    store.setEmails([meetingEmail, ...store.emails])
+    store.selectEmail(meetingEmail.id)
+
+    render(<MailView />)
+
+    // Verify Scheduler is present
+    expect(screen.getByText(/Event & To-Do Scheduler/i)).toBeInTheDocument()
+    expect(screen.getByText(/Hide Controls/i)).toBeInTheDocument()
+
+    // Verify conflict status is displayed
+    expect(
+      screen.getByText(/completely free in both your Calendar and To-Dos/i)
+    ).toBeInTheDocument()
+
+    // Click "Set Event & To-Do"
+    const setEventAndTodoBtn = screen.getByRole("button", { name: /Set Event & To-Do/i })
+    fireEvent.click(setEventAndTodoBtn)
+
+    // Verify confirmation
+    await waitFor(() => {
+      expect(screen.getByText(/Event & To-Do Added!/i)).toBeInTheDocument()
+    })
+
+    // Click "Update AI Draft with this Time"
+    const updateDraftBtn = screen.getByRole("button", { name: /Update AI Draft with this Time/i })
+    fireEvent.click(updateDraftBtn)
+
+    // Verify textarea contains confirmation text
+    await waitFor(() => {
+      const textarea = screen.getByPlaceholderText(/Write your reply/i) as HTMLTextAreaElement
+      expect(textarea.value).toContain("I have confirmed our meeting")
+      expect(textarea.value).toContain("10:00 AM")
     })
   })
 })

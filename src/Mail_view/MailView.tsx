@@ -45,6 +45,7 @@ import {
   batchModifyGmailMessages,
 } from "@/services/gmailApiService"
 import EmailHtmlViewer from "./EmailHtmlViewer"
+import MeetingSchedulePlanner from "./MeetingSchedulePlanner"
 
 function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
@@ -270,6 +271,13 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
         </div>
       )}
 
+      {/* Interactive Meeting Schedule & Conflict Planner */}
+      <MeetingSchedulePlanner
+        email={email}
+        onUpdateDraftText={onReplyTextChange}
+        currentDraftText={replyText}
+      />
+
       {/* Draft / Reply Body Editable */}
       <div>
         <div className="flex items-center justify-between mb-1.5">
@@ -477,6 +485,13 @@ const DraftEditorForm = memo(function DraftEditorForm({
             className="flex-1 rounded-xl border border-gray-300/80 bg-white px-3 py-1.5 text-xs text-neutral-800 outline-none focus:border-neutral-500 font-sans"
           />
         </div>
+
+        {/* Interactive Meeting Schedule & Conflict Planner */}
+        <MeetingSchedulePlanner
+          email={email}
+          onUpdateDraftText={setBody}
+          currentDraftText={body}
+        />
 
         <div>
           <div className="flex items-center justify-between mb-1.5">

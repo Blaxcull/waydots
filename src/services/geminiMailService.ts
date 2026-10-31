@@ -1,6 +1,7 @@
 import { isOtpEmail, type Email, type EmailPriority, type MeetingInfo, type ScheduleConflict, type EmailDraft } from "@/store/emailStore"
 import { useEventsStore } from "@/store/eventsStore"
 import { useGoalsStore } from "@/store/goalsStore"
+import { useTasksStore } from "@/store/tasksStore"
 
 /**
  * Reads Gemini API key directly from environment (.env: VITE_GEMINI_API_KEY)
@@ -60,6 +61,11 @@ export function isActualMeetingRequest(
     return false
   }
 
+  const subjectClean = (email.subject || "").trim().toLowerCase()
+  if (/^(?:re:\s*|fwd:\s*|urgent:\s*)?(?:meeting|sync|call|1:1|catch\s*up|discussion)\b/i.test(subjectClean)) {
+    return true
+  }
+
   const text = `${email.subject || ""} ${email.body || ""}`.toLowerCase()
 
   // Strong phrases indicating someone is asking to meet / schedule a conversation
@@ -73,6 +79,10 @@ export function isActualMeetingRequest(
     /\bwhat time(?:s)?\s+(?:work|suit)\s+(?:for\s+)?you\b/i,
     /\bcalendar\s+invite\b/i,
     /\b(?:google meet|zoom)\s+(?:link|invite|call)\b/i,
+    /\b(?:tomorrow|tommorow|today|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+(?:meeting|sync|call|discussion)\b/i,
+    /\b(?:meeting|sync|call|discussion|1:1)\s+(?:tomorrow|tommorow|today|at\s+\d{1,2}|\d{1,2}\s*(?:am|pm))\b/i,
+    /\b(?:meeting|sync|call)\s+at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/i,
+    /\b(?:meet|sync|call)\s+(?:tomorrow|tommorow|today)\b/i,
   ]
 
   // Mock sample email 1 is explicitly a meeting sync request
@@ -104,7 +114,7 @@ export function analyzeEmailWithKeywords(email: Email): {
   // Timing detection (only applied if actual meeting)
   let detectedTiming: string | undefined
   const timingMatch = text.match(
-    /(?:this\s+|next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|today)(?:\s+(?:morning|afternoon|evening|night))?(?:\s+(?:at|after|before)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?|\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i
+    /(?:this\s+|next\s+)?(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|tomorrow|tommorow|today)(?:\s+(?:morning|afternoon|evening|night))?(?:\s+(?:at|after|before)\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?)?|\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/i
   )
   if (timingMatch) {
     detectedTiming = timingMatch[0].trim()
@@ -389,6 +399,210 @@ export function sortEmailsByPriorityOrder(emails: Email[]): Email[] {
   })
 }
 
+export interface ConflictItem {
+  id: string
+  type: "event" | "task"
+  title: string
+  time: string
+  date: string
+}
+
+export function parseTimeToMinutes(timeStr: string): number | null {
+  if (!timeStr) return null
+  const clean = timeStr.trim().toLowerCase()
+  const match = clean.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i)
+  if (!match) return null
+
+  let hours = parseInt(match[1], 10)
+  const minutes = match[2] ? parseInt(match[2], 10) : 0
+  const period = match[3]?.toLowerCase()
+
+  if (period === "pm" && hours < 12) hours += 12
+  if (period === "am" && hours === 12) hours = 0
+
+  return hours * 60 + minutes
+}
+
+export function formatMinutesToTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60)
+  const mins = totalMinutes % 60
+  const period = hours >= 12 ? "PM" : "AM"
+  const displayHours = hours % 12 === 0 ? 12 : hours % 12
+  const displayMins = mins.toString().padStart(2, "0")
+  return `${displayHours}:${displayMins} ${period}`
+}
+
+export interface ExtractedMeetingDateTime {
+  date: string // "YYYY-MM-DD"
+  startTimeMinutes: number // minutes from midnight
+  endTimeMinutes: number
+  displayDate: string
+  displayTime: string
+  durationMinutes: number
+}
+
+export function extractMeetingDateTime(email: Email): ExtractedMeetingDateTime {
+  const text = `${email.subject || ""} ${email.body || ""}`.toLowerCase()
+  const now = new Date()
+
+  // 1. Calculate target Date
+  let targetDate = new Date(now)
+  let displayDate = "Tomorrow"
+
+  if (text.includes("tomorrow") || text.includes("tommorow")) {
+    targetDate.setDate(now.getDate() + 1)
+    displayDate = "Tomorrow"
+  } else if (text.includes("today")) {
+    targetDate = new Date(now)
+    displayDate = "Today"
+  } else {
+    const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"]
+    let foundDayIndex = -1
+    for (let i = 0; i < days.length; i++) {
+      if (text.includes(days[i])) {
+        foundDayIndex = i
+        displayDate = days[i].charAt(0).toUpperCase() + days[i].slice(1)
+        break
+      }
+    }
+    if (foundDayIndex !== -1) {
+      const currentDayIndex = now.getDay()
+      let diff = foundDayIndex - currentDayIndex
+      if (diff <= 0) diff += 7
+      targetDate.setDate(now.getDate() + diff)
+    } else {
+      targetDate.setDate(now.getDate() + 1)
+      displayDate = "Tomorrow"
+    }
+  }
+
+  const yyyy = targetDate.getFullYear()
+  const mm = String(targetDate.getMonth() + 1).padStart(2, "0")
+  const dd = String(targetDate.getDate()).padStart(2, "0")
+  const dateStr = `${yyyy}-${mm}-${dd}`
+
+  // 2. Extract Time
+  let startTimeMinutes = 10 * 60 // default 10:00 AM
+  const timeMatch =
+    text.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i) ||
+    text.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i)
+  if (timeMatch) {
+    let h = parseInt(timeMatch[1], 10)
+    const m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0
+    const p = timeMatch[3]?.toLowerCase()
+    if (p === "pm" && h < 12) h += 12
+    if (p === "am" && h === 12) h = 0
+    if (!p) {
+      if (h >= 1 && h <= 6) h += 12
+    }
+    startTimeMinutes = h * 60 + m
+  }
+
+  // 3. Duration
+  let durationMinutes = 30
+  const durMatch = text.match(/(\d{1,3})\s*(?:mins|min|minutes|hours|hour|hr|hrs)/i)
+  if (durMatch) {
+    const val = parseInt(durMatch[1], 10)
+    if (durMatch[0].includes("hour") || durMatch[0].includes("hr")) {
+      durationMinutes = val * 60
+    } else {
+      durationMinutes = val
+    }
+  }
+
+  const endTimeMinutes = startTimeMinutes + durationMinutes
+
+  return {
+    date: dateStr,
+    startTimeMinutes,
+    endTimeMinutes,
+    displayDate,
+    displayTime: formatMinutesToTime(startTimeMinutes),
+    durationMinutes,
+  }
+}
+
+/**
+ * Checks for schedule conflicts on a target date and time window
+ * across BOTH Calendar Events (eventsStore) and To-Dos (tasksStore).
+ */
+export function checkDateTimeConflicts(
+  targetDate: string,
+  startMinutes: number,
+  endMinutes: number
+): ConflictItem[] {
+  const conflicts: ConflictItem[] = []
+
+  // 1. Events in useEventsStore
+  const eventsState = useEventsStore.getState()
+  const eventsForDate = eventsState.eventsCache?.[targetDate] || []
+  const seenEventIds = new Set<string>()
+
+  for (const evt of eventsForDate) {
+    if (!evt || seenEventIds.has(evt.id)) continue
+    seenEventIds.add(evt.id)
+
+    // Overlap condition: startA < endB && endA > startB
+    if (evt.start_time < endMinutes && evt.end_time > startMinutes) {
+      conflicts.push({
+        id: evt.id,
+        type: "event",
+        title: evt.title,
+        time: `${formatMinutesToTime(evt.start_time)} - ${formatMinutesToTime(evt.end_time)}`,
+        date: targetDate,
+      })
+    }
+  }
+
+  // 2. Tasks in useTasksStore
+  const tasksState = useTasksStore.getState()
+  const tasksForDate = (tasksState.tasks || []).filter(
+    (t) => !t.completed && t.dueDate === targetDate
+  )
+
+  for (const task of tasksForDate) {
+    if (task.dueTime) {
+      const taskStart = parseTimeToMinutes(task.dueTime)
+      if (taskStart !== null) {
+        const taskEnd = taskStart + 30 // assume 30-min task slot
+        if (taskStart < endMinutes && taskEnd > startMinutes) {
+          conflicts.push({
+            id: task.id,
+            type: "task",
+            title: task.title,
+            time: task.dueTime,
+            date: targetDate,
+          })
+        }
+      }
+    }
+  }
+
+  return conflicts
+}
+
+/**
+ * Reschedules a conflicting event or task to clear the schedule conflict.
+ */
+export function rescheduleConflictingItem(
+  conflict: ConflictItem,
+  newTimeMinutes: number
+): void {
+  if (conflict.type === "event") {
+    const eventsStore = useEventsStore.getState()
+    const duration = 45
+    void eventsStore.updateEvent(conflict.id, {
+      start_time: newTimeMinutes,
+      end_time: newTimeMinutes + duration,
+    })
+  } else if (conflict.type === "task") {
+    const tasksStore = useTasksStore.getState()
+    tasksStore.updateTask(conflict.id, {
+      dueTime: formatMinutesToTime(newTimeMinutes),
+    })
+  }
+}
+
 /**
  * Detects whether an email meeting request has a schedule conflict
  * with Calendar Events, Tasks, or Goals.
@@ -401,42 +615,34 @@ export function detectScheduleConflict(
   const isMeeting = isActualMeetingRequest(email, customPrompt)
   if (!isMeeting) return null
 
-  // Check existing events in useEventsStore
-  const eventsState = useEventsStore.getState()
-  const targetDate = "2026-10-31" // Target date from email or current mock
-  const existingEvents = eventsState.eventsCache?.[targetDate] || []
+  // 1. Live dynamic conflict check across eventsStore and tasksStore
+  const extracted = extractMeetingDateTime(email)
+  const conflicts = checkDateTimeConflicts(
+    extracted.date,
+    extracted.startTimeMinutes,
+    extracted.endTimeMinutes
+  )
 
-  // Check for conflict with existing events on target date
-  const foundConflictEvent = existingEvents.find((evt) => {
-    return (
-      (evt.start_time < 630 && evt.end_time > 540) ||
-      evt.title.toLowerCase().includes("sprint") ||
-      evt.title.toLowerCase().includes("standup") ||
-      evt.title.toLowerCase().includes("review")
-    )
-  })
-
-  if (foundConflictEvent) {
-    const startHour = Math.floor(foundConflictEvent.start_time / 60)
-    const startMin = (foundConflictEvent.start_time % 60).toString().padStart(2, "0")
-    const endHour = Math.floor(foundConflictEvent.end_time / 60)
-    const endMin = (foundConflictEvent.end_time % 60).toString().padStart(2, "0")
-    const timeStr = `${startHour}:${startMin} - ${endHour}:${endMin}`
+  if (conflicts.length > 0) {
+    const first = conflicts[0]
+    const altStart = extracted.startTimeMinutes + 90
+    const altEnd = altStart + extracted.durationMinutes
+    const altSlot = `${extracted.displayDate} • ${formatMinutesToTime(altStart)} - ${formatMinutesToTime(altEnd)}`
 
     return {
       hasConflict: true,
-      conflictingType: "event",
-      conflictingTitle: foundConflictEvent.title,
-      conflictingTime: timeStr,
-      conflictingDate: targetDate,
-      proposedSlot: "Thursday, Oct 31 • 9:30 AM - 10:15 AM",
-      alternativeSlot: "Thursday, Oct 31 • 11:30 AM - 12:15 PM",
-      reason: `Overlaps with scheduled "${foundConflictEvent.title}" (${timeStr})`,
+      conflictingType: first.type,
+      conflictingTitle: first.title,
+      conflictingTime: first.time,
+      conflictingDate: extracted.date,
+      proposedSlot: `${extracted.displayDate} • ${extracted.displayTime} - ${formatMinutesToTime(extracted.endTimeMinutes)}`,
+      alternativeSlot: altSlot,
+      reason: `Overlaps with scheduled ${first.type} "${first.title}" (${first.time})`,
       resolved: false,
     }
   }
 
-  // Demonstration conflict for actual meeting requests proposing Thursday morning
+  // 2. Demonstration conflict for mock meeting requests proposing Thursday morning or email-1
   const text = `${email.subject} ${email.body}`.toLowerCase()
   if (text.includes("thursday") || text.includes("q4") || email.id === "email-1") {
     return {
