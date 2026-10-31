@@ -31,7 +31,7 @@ export function SearchGoalsDialog({ open, onOpenChange, onSelectGoal }: SearchGo
       return items.map((item) => ({
         id: item.id,
         text: item.text,
-        notes: item.notes,
+        notes: item.notes || "",
         color: item.color,
         icon: item.icon,
         targetValue: item.targetValue,

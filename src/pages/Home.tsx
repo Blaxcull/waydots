@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { motion } from "framer-motion";
@@ -12,11 +11,7 @@ import {
   Check,
   X,
   Layers,
-  Github,
-  Linkedin,
-  Mail,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import type { SubscriptionPlan, SubscriptionStatus } from "@/hooks/useSubscription";
 
 const fadeInUp = {
@@ -749,20 +744,6 @@ function CTA({ isAuthenticated }: { isAuthenticated: boolean }) {
 
 /* ---------- Footer ---------- */
 function Footer() {
-  const [mailFeedback, setMailFeedback] = useState<"idle" | "copied">("idle")
-
-  const handleMailClick = async (email: string) => {
-    window.location.href = `mailto:${email}`
-
-    try {
-      await navigator.clipboard.writeText(email)
-      setMailFeedback("copied")
-      window.setTimeout(() => setMailFeedback("idle"), 2500)
-    } catch {
-      setMailFeedback("idle")
-    }
-  }
-
   return (
     <footer className="border-t border-border/70 py-16">
       <div className="mx-auto max-w-6xl px-6 flex flex-col md:flex-row items-center justify-between gap-8 text-sm text-muted-foreground">
@@ -771,54 +752,8 @@ function Footer() {
           <span className="font-bold text-foreground tracking-tight text-lg">Waydots</span>
           <span className="font-medium">© {new Date().getFullYear()}</span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex gap-8">
-            <SocialLink icon={Mail} href="mailto:blaxcull@gmail.com" onMailClick={handleMailClick} />
-            <SocialLink icon={Github} href="https://github.com/Blaxcull" />
-            <SocialLink icon={Linkedin} href="https://www.linkedin.com/in/blaxcull/" />
-          </div>
-          {mailFeedback === "copied" ? (
-            <span className="text-xs font-medium text-foreground">Email copied</span>
-          ) : null}
-        </div>
         <span className="font-medium tracking-tight">A calendar for intentional living.</span>
       </div>
     </footer>
-  );
-}
-
-function SocialLink({
-  icon: Icon,
-  href,
-  onMailClick,
-}: {
-  icon: LucideIcon
-  href: string
-  onMailClick?: (email: string) => void | Promise<void>
-}) {
-  const isMailto = href.startsWith("mailto:")
-  const email = href.replace("mailto:", "")
-  const label = isMailto ? `Email ${email}` : "Open social link"
-
-  const handleClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (!isMailto) {
-      return
-    }
-
-    event.preventDefault()
-    await onMailClick?.(email)
-  }
-
-  return (
-    <a
-      href={href}
-      aria-label={label}
-      onClick={handleClick}
-      target={isMailto ? undefined : "_blank"}
-      rel={isMailto ? undefined : "noreferrer"}
-      className="text-muted-foreground hover:text-foreground transition-colors p-2 rounded-lg hover:bg-surface/50"
-    >
-      <Icon className="h-5 w-5" />
-    </a>
   );
 }

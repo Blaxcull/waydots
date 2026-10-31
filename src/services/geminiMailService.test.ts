@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import {
   analyzeEmailWithKeywords,
   sortEmailsByPriorityOrder,
@@ -11,6 +11,13 @@ import {
 import { isOtpEmail, type Email } from "@/store/emailStore"
 
 describe("geminiMailService", () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Network disabled in test suite"))
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
   const sampleMeetingEmail: Email = {
     id: "test-1",
     subject: "Urgent: Sprint Kickoff & 45-minute sync",
