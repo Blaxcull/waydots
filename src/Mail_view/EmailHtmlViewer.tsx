@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react"
-import { Eye, Code } from "lucide-react"
 
 interface EmailHtmlViewerProps {
   html?: string
@@ -19,7 +18,6 @@ export default function EmailHtmlViewer({
   )
 
   const rawHtml = html || (isHtml ? plainText : "")
-  const [viewMode, setViewMode] = useState<"html" | "text">("html")
   const [iframeHeight, setIframeHeight] = useState<number>(300)
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
@@ -92,7 +90,7 @@ export default function EmailHtmlViewer({
 
   // Auto-resize observing DOM changes and dynamic asset loading (images, webfonts)
   useEffect(() => {
-    if (!isHtml || viewMode !== "html") return
+    if (!isHtml) return
     const iframe = iframeRef.current
     if (!iframe) return
 
@@ -119,7 +117,7 @@ export default function EmailHtmlViewer({
       clearTimeout(t2)
       clearTimeout(t3)
     }
-  }, [safeDoc, isHtml, viewMode, updateHeight])
+  }, [safeDoc, isHtml, updateHeight])
 
   // Pure Plain Text email: render directly with typographic line breaks
   if (!isHtml) {
@@ -130,61 +128,18 @@ export default function EmailHtmlViewer({
     )
   }
 
+  // Formatted HTML is displayed by default without any raw text toggle pill
   return (
-    <div className={`flex flex-col gap-2.5 ${className}`}>
-      {/* View Toggle Bar (Only shown for HTML emails when clean plain text is also available) */}
-      {plainText && plainText !== rawHtml && (
-        <div className="flex items-center justify-between border-b border-gray-200/80 pb-2">
-          <div className="text-[11px] font-medium text-neutral-500">
-            {viewMode === "html" ? "Rich HTML Email" : "Plain Text View"}
-          </div>
-          <div className="flex items-center gap-1 rounded-full border border-gray-300/70 bg-[#dededc] p-0.5 text-[11px] font-semibold text-neutral-600">
-            <button
-              type="button"
-              onClick={() => setViewMode("html")}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition-all cursor-pointer ${
-                viewMode === "html"
-                  ? "bg-white text-neutral-900 shadow-2xs"
-                  : "hover:text-neutral-900"
-              }`}
-            >
-              <Eye className="h-3 w-3" />
-              <span>Formatted</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("text")}
-              className={`flex items-center gap-1 rounded-full px-2.5 py-1 transition-all cursor-pointer ${
-                viewMode === "text"
-                  ? "bg-white text-neutral-900 shadow-2xs"
-                  : "hover:text-neutral-900"
-              }`}
-            >
-              <Code className="h-3 w-3" />
-              <span>Raw Text</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {viewMode === "html" ? (
-        <div className="w-full overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-2xs">
-          <iframe
-            ref={iframeRef}
-            srcDoc={safeDoc}
-            onLoad={updateHeight}
-            sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-            title="Email Message Content"
-            className="w-full border-0 transition-all block"
-            style={{ height: `${iframeHeight}px`, minHeight: "220px" }}
-          />
-        </div>
-      ) : (
-        <div className="text-neutral-800 text-sm md:text-base leading-relaxed whitespace-pre-line font-normal break-words p-3 bg-white/70 rounded-xl border border-gray-200/70 font-mono text-xs">
-          {plainText}
-        </div>
-      )}
+    <div className={`w-full overflow-hidden rounded-2xl border border-gray-200/90 bg-white shadow-2xs ${className}`}>
+      <iframe
+        ref={iframeRef}
+        srcDoc={safeDoc}
+        onLoad={updateHeight}
+        sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
+        title="Email Message Content"
+        className="w-full border-0 transition-all block"
+        style={{ height: `${iframeHeight}px`, minHeight: "220px" }}
+      />
     </div>
   )
 }
-
