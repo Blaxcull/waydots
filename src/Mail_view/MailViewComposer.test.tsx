@@ -46,8 +46,15 @@ describe("MailView Composer & Header Layout", () => {
     // Verify Row 4 header banner is completely removed from the header
     expect(screen.queryByText("Evaluates Calendar & Tasks for timing conflicts and crafts a situation-aware reply")).not.toBeInTheDocument()
 
-    // Verify the unified Smart Reply Composer has "Generate AI Draft"
-    expect(screen.getByRole("button", { name: /Generate AI Draft/i })).toBeInTheDocument()
+    // Verify "Powered by Gemini AI" attribution is removed
+    expect(screen.queryByText(/Powered by Gemini/i)).not.toBeInTheDocument()
+
+    // Verify "Linked Action Item" box is removed
+    expect(screen.queryByText(/Linked Action Item/i)).not.toBeInTheDocument()
+
+    // For firstEmail with an existing aiDraft:
+    // Verify the unified Smart Reply Composer has "Regenerate AI Draft"
+    expect(screen.getByRole("button", { name: /Regenerate AI Draft/i })).toBeInTheDocument()
 
     // Verify AI Prompt Modification Box with quick style chips is present
     expect(screen.getByText("AI Prompt Modification Box")).toBeInTheDocument()
@@ -55,6 +62,31 @@ describe("MailView Composer & Header Layout", () => {
     expect(screen.getByRole("button", { name: /Make Concise/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /Professional/i })).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Type prompt to change draft/i)).toBeInTheDocument()
+  })
+
+  it("does not display the AI Prompt Modification Box until an AI draft is generated", async () => {
+    const store = useEmailStore.getState()
+    const secondEmail = store.emails[1] // Second email without initial draft
+    store.selectEmail(secondEmail.id)
+
+    render(<MailView />)
+
+    // Initially, for an email without AI draft, AI Prompt Modification Box should NOT be displayed
+    expect(screen.getByRole("button", { name: /Generate AI Draft/i })).toBeInTheDocument()
+    expect(screen.queryByText("AI Prompt Modification Box")).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/Type prompt to change draft/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Powered by Gemini/i)).not.toBeInTheDocument()
+
+    // Click "Generate AI Draft"
+    const generateBtn = screen.getByRole("button", { name: /Generate AI Draft/i })
+    fireEvent.click(generateBtn)
+
+    // Now the AI Prompt Modification Box should appear
+    await waitFor(() => {
+      expect(screen.getByText("AI Prompt Modification Box")).toBeInTheDocument()
+      expect(screen.getByPlaceholderText(/Type prompt to change draft/i)).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: /Regenerate AI Draft/i })).toBeInTheDocument()
+    })
   })
 
   it("sends AI generated draft reply using the exact same send flow as manually written messages", async () => {

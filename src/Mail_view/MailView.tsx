@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   X,
   Calendar,
-  CheckSquare,
   Minus,
   ChevronDown,
   MailOpen,
@@ -104,6 +103,12 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
   onClearDraft,
   onSendReply,
 }: SmartReplyComposerProps) {
+  const hasAiDraft = Boolean(
+    email.aiDraft &&
+      email.aiDraft.status !== "dismissed" &&
+      Boolean(email.aiDraft.suggestedReply?.trim())
+  )
+
   return (
     <div className="mt-2 rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4 sm:p-5 shadow-xs flex flex-col gap-3.5">
       {/* Header: Reply-to Details and Generate AI Draft Button */}
@@ -132,7 +137,7 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
           <span>
             {isGeneratingDraft
               ? "Drafting..."
-              : replyText.trim()
+              : hasAiDraft
               ? "Regenerate AI Draft"
               : "Generate AI Draft"}
           </span>
@@ -206,31 +211,18 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
         </div>
       )}
 
-      {/* Proposed Slot & Linked Task Previews */}
-      {((email.meetingInfo?.hasMeeting && email.aiDraft?.suggestedSlot) || email.aiDraft?.suggestedTaskTitle) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-          {email.meetingInfo?.hasMeeting && email.aiDraft?.suggestedSlot && (
-            <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2 text-neutral-800">
-              <Calendar className="h-4 w-4 text-neutral-600 shrink-0" />
-              <div className="min-w-0">
-                <div className="font-semibold text-neutral-900">Meeting Slot</div>
-                <div className="text-[11px] text-neutral-600 truncate">
-                  {email.aiDraft.suggestedSlot}
-                </div>
+      {/* Proposed Slot Preview (only for actual meetings) */}
+      {email.meetingInfo?.hasMeeting && email.aiDraft?.suggestedSlot && (
+        <div className="text-xs">
+          <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2 text-neutral-800">
+            <Calendar className="h-4 w-4 text-neutral-600 shrink-0" />
+            <div className="min-w-0">
+              <div className="font-semibold text-neutral-900">Meeting Slot</div>
+              <div className="text-[11px] text-neutral-600 truncate">
+                {email.aiDraft.suggestedSlot}
               </div>
             </div>
-          )}
-          {email.aiDraft?.suggestedTaskTitle && (
-            <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2 text-neutral-800">
-              <CheckSquare className="h-4 w-4 text-neutral-600 shrink-0" />
-              <div className="min-w-0">
-                <div className="font-semibold text-neutral-900">Linked Action Item</div>
-                <div className="text-[11px] text-neutral-600 truncate">
-                  {email.aiDraft.suggestedTaskTitle}
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -255,70 +247,71 @@ const SmartReplyComposer = memo(function SmartReplyComposer({
         />
       </div>
 
-      {/* Interactive AI Changing Box ("AI Prompt Modification Box") */}
-      <div className="rounded-xl border border-gray-300/80 bg-[#f7f7f6] p-3 shadow-2xs">
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
-            <Sparkles className="h-3.5 w-3.5 text-neutral-900" />
-            <span>AI Prompt Modification Box</span>
+      {/* Interactive AI Changing Box ("AI Prompt Modification Box") - Only appears after generating an AI response */}
+      {hasAiDraft && (
+        <div className="rounded-xl border border-gray-300/80 bg-[#f7f7f6] p-3 shadow-2xs">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
+              <Sparkles className="h-3.5 w-3.5 text-neutral-900" />
+              <span>AI Prompt Modification Box</span>
+            </div>
           </div>
-          <span className="text-[10px] text-neutral-500 font-medium">Powered by Gemini AI</span>
-        </div>
 
-        {/* Quick prompt suggestion chips */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-          {[
-            { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
-            { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
-            { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
-            ...(email.meetingInfo?.hasMeeting
-              ? [
-                  { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
-                  { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
-                ]
-              : [
-                  { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
-                  { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
-                ]),
-          ].map((chip) => (
+          {/* Quick prompt suggestion chips */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+            {[
+              { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
+              { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
+              { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
+              ...(email.meetingInfo?.hasMeeting
+                ? [
+                    { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
+                    { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
+                  ]
+                : [
+                    { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
+                    { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
+                  ]),
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                disabled={isRefiningDraft}
+                onClick={() => onRefineWithPrompt(chip.prompt)}
+                className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom Prompt Input & Refine Button */}
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={aiPromptInstruction}
+              onChange={(e) => onAiPromptInstructionChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  onRefineWithPrompt()
+                }
+              }}
+              placeholder="Type prompt to change draft (e.g. 'Add request for slide deck', 'Sound more casual')..."
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
+            />
             <button
-              key={chip.label}
               type="button"
-              disabled={isRefiningDraft}
-              onClick={() => onRefineWithPrompt(chip.prompt)}
-              className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              disabled={isRefiningDraft || !aiPromptInstruction.trim()}
+              onClick={() => onRefineWithPrompt()}
+              className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer shrink-0"
             >
-              {chip.label}
+              <Wand2 className={`h-3 w-3 ${isRefiningDraft ? "animate-spin" : ""}`} />
+              <span>{isRefiningDraft ? "Modifying..." : "Update Draft"}</span>
             </button>
-          ))}
+          </div>
         </div>
-
-        {/* Custom Prompt Input & Refine Button */}
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={aiPromptInstruction}
-            onChange={(e) => onAiPromptInstructionChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault()
-                onRefineWithPrompt()
-              }
-            }}
-            placeholder="Type prompt to change draft (e.g. 'Add request for slide deck', 'Sound more casual')..."
-            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
-          />
-          <button
-            type="button"
-            disabled={isRefiningDraft || !aiPromptInstruction.trim()}
-            onClick={() => onRefineWithPrompt()}
-            className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer shrink-0"
-          >
-            <Wand2 className={`h-3 w-3 ${isRefiningDraft ? "animate-spin" : ""}`} />
-            <span>{isRefiningDraft ? "Modifying..." : "Update Draft"}</span>
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Sender Identity & Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-300/70 pt-3">
@@ -441,7 +434,6 @@ const DraftEditorForm = memo(function DraftEditorForm({
               <Sparkles className="h-3.5 w-3.5 text-neutral-900" />
               <span>AI Prompt Modification Box</span>
             </div>
-            <span className="text-[10px] text-neutral-500 font-medium">Powered by Gemini AI</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
