@@ -69,52 +69,291 @@ function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   )
 }
 
-interface ManualReplyFormProps {
-  emailId: string
+interface SmartReplyComposerProps {
+  email: Email
   senderAccount: string
+  replyText: string
+  onReplyTextChange: (text: string) => void
+  isGeneratingDraft: boolean
+  isRefiningDraft: boolean
   isSending: boolean
-  onSend: (emailId: string, replyText: string) => Promise<void>
+  onGenerateDraft: () => void
+  onRefineWithPrompt: (instructionToUse?: string) => void
+  aiPromptInstruction: string
+  onAiPromptInstructionChange: (instruction: string) => void
+  onResolveAlternative: () => void
+  onAcceptAndReschedule: () => void
+  onClearDraft: () => void
+  onSendReply: () => void
 }
 
-const ManualReplyForm = memo(function ManualReplyForm({
-  emailId,
+const SmartReplyComposer = memo(function SmartReplyComposer({
+  email,
   senderAccount,
+  replyText,
+  onReplyTextChange,
+  isGeneratingDraft,
+  isRefiningDraft,
   isSending,
-  onSend,
-}: ManualReplyFormProps) {
-  const [text, setText] = useState("")
-
-  useEffect(() => {
-    setText("")
-  }, [emailId])
-
-  const handleSend = async () => {
-    if (!text.trim() || isSending) return
-    const textToSend = text.trim()
-    await onSend(emailId, textToSend)
-    setText("")
-  }
-
+  onGenerateDraft,
+  onRefineWithPrompt,
+  aiPromptInstruction,
+  onAiPromptInstructionChange,
+  onResolveAlternative,
+  onAcceptAndReschedule,
+  onClearDraft,
+  onSendReply,
+}: SmartReplyComposerProps) {
   return (
-    <div className="mt-6 rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4">
-      <div className="text-xs font-semibold text-neutral-600 mb-2">Write a Reply</div>
-      <textarea
-        rows={3}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder={`Reply as ${senderAccount}...`}
-        className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans leading-relaxed"
-      />
-      <div className="mt-2.5 flex justify-end">
+    <div className="mt-2 rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4 sm:p-5 shadow-xs flex flex-col gap-3.5">
+      {/* Header: Reply-to Details and Generate AI Draft Button */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-900 text-white font-bold text-xs shrink-0 shadow-xs">
+            {email.senderName.charAt(0)}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-bold text-neutral-900 truncate">
+              Reply to {email.senderName}
+            </div>
+            <div className="text-xs text-neutral-500 truncate">
+              {email.senderEmail}
+            </div>
+          </div>
+        </div>
+
         <Button
           type="button"
-          onClick={handleSend}
-          disabled={!text.trim() || isSending}
-          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-50 cursor-pointer"
+          disabled={isGeneratingDraft}
+          onClick={onGenerateDraft}
+          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-3.5 py-1.5 font-semibold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0 flex items-center gap-1.5 ml-auto"
         >
-          <Send className="mr-1.5 h-3.5 w-3.5" />
-          {isSending ? "Sending..." : "Send Reply"}
+          <Sparkles className={`h-3.5 w-3.5 ${isGeneratingDraft ? "animate-spin text-amber-300" : "text-amber-400"}`} />
+          <span>
+            {isGeneratingDraft
+              ? "Drafting..."
+              : replyText.trim()
+              ? "Regenerate AI Draft"
+              : "Generate AI Draft"}
+          </span>
         </Button>
+      </div>
+
+      {/* Schedule Conflict Alert & Resolution Controls */}
+      {email.aiDraft?.conflict?.hasConflict && (
+        <div
+          className={`rounded-xl border p-3.5 transition-all ${
+            email.aiDraft.conflict.resolved
+              ? "border-emerald-300 bg-emerald-500/10 text-emerald-950"
+              : "border-amber-300 bg-amber-500/10 text-amber-950"
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            {email.aiDraft.conflict.resolved ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            )}
+            <div className="flex-1 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold">
+                  {email.aiDraft.conflict.resolved
+                    ? "Schedule Conflict Resolved"
+                    : "Schedule Conflict Detected"}
+                </span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    email.aiDraft.conflict.resolved
+                      ? "bg-emerald-200 text-emerald-800"
+                      : "bg-amber-200 text-amber-900 animate-pulse"
+                  }`}
+                >
+                  {email.aiDraft.conflict.resolved ? "Synced" : "Action Needed"}
+                </span>
+              </div>
+
+              <p className="mt-1 text-neutral-700 leading-relaxed">
+                {email.aiDraft.conflict.resolved
+                  ? email.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
+                    ? `Conflicting task "${email.aiDraft.conflict.conflictingTitle}" has been moved to 2:00 PM in your Calendar & To-Do list. Meeting confirmed for 9:30 AM.`
+                    : `Proposed alternative open slot (${email.aiDraft.conflict.alternativeSlot}) has been set in your drafted reply.`
+                  : `The requested meeting conflicts with scheduled ${email.aiDraft.conflict.conflictingType} "${email.aiDraft.conflict.conflictingTitle}" (${email.aiDraft.conflict.conflictingTime}). Choose how to manage it:`}
+              </p>
+
+              {!email.aiDraft.conflict.resolved && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onResolveAlternative}
+                    className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-xs hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Clock className="h-3.5 w-3.5 text-amber-600" />
+                    <span>Propose Alternative ({email.aiDraft.conflict.alternativeSlot.split("•")[1]?.trim() || "11:30 AM"})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onAcceptAndReschedule}
+                    className="flex items-center gap-1.5 rounded-lg border border-amber-400 bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Calendar className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Accept &amp; Reschedule Task to 2:00 PM</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Proposed Slot & Linked Task Previews */}
+      {((email.meetingInfo?.hasMeeting && email.aiDraft?.suggestedSlot) || email.aiDraft?.suggestedTaskTitle) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+          {email.meetingInfo?.hasMeeting && email.aiDraft?.suggestedSlot && (
+            <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2 text-neutral-800">
+              <Calendar className="h-4 w-4 text-neutral-600 shrink-0" />
+              <div className="min-w-0">
+                <div className="font-semibold text-neutral-900">Meeting Slot</div>
+                <div className="text-[11px] text-neutral-600 truncate">
+                  {email.aiDraft.suggestedSlot}
+                </div>
+              </div>
+            </div>
+          )}
+          {email.aiDraft?.suggestedTaskTitle && (
+            <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2 text-neutral-800">
+              <CheckSquare className="h-4 w-4 text-neutral-600 shrink-0" />
+              <div className="min-w-0">
+                <div className="font-semibold text-neutral-900">Linked Action Item</div>
+                <div className="text-[11px] text-neutral-600 truncate">
+                  {email.aiDraft.suggestedTaskTitle}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Draft / Reply Body Editable */}
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+            Reply Message
+          </label>
+          {Boolean(replyText.length) && (
+            <span className="text-[11px] text-neutral-400">
+              {replyText.length} chars
+            </span>
+          )}
+        </div>
+        <textarea
+          rows={5}
+          value={replyText}
+          onChange={(e) => onReplyTextChange(e.target.value)}
+          placeholder={`Write your reply to ${email.senderName}, or click "Generate AI Draft" above to let Gemini craft one...`}
+          className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 leading-relaxed outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400 font-sans placeholder:text-neutral-400 transition-all"
+        />
+      </div>
+
+      {/* Interactive AI Changing Box ("AI Prompt Modification Box") */}
+      <div className="rounded-xl border border-gray-300/80 bg-[#f7f7f6] p-3 shadow-2xs">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
+            <Sparkles className="h-3.5 w-3.5 text-neutral-900" />
+            <span>AI Prompt Modification Box</span>
+          </div>
+          <span className="text-[10px] text-neutral-500 font-medium">Powered by Gemini AI</span>
+        </div>
+
+        {/* Quick prompt suggestion chips */}
+        <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+          {[
+            { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
+            { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
+            { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
+            ...(email.meetingInfo?.hasMeeting
+              ? [
+                  { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
+                  { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
+                ]
+              : [
+                  { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
+                  { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
+                ]),
+          ].map((chip) => (
+            <button
+              key={chip.label}
+              type="button"
+              disabled={isRefiningDraft}
+              onClick={() => onRefineWithPrompt(chip.prompt)}
+              className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Custom Prompt Input & Refine Button */}
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={aiPromptInstruction}
+            onChange={(e) => onAiPromptInstructionChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault()
+                onRefineWithPrompt()
+              }
+            }}
+            placeholder="Type prompt to change draft (e.g. 'Add request for slide deck', 'Sound more casual')..."
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
+          />
+          <button
+            type="button"
+            disabled={isRefiningDraft || !aiPromptInstruction.trim()}
+            onClick={() => onRefineWithPrompt()}
+            className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer shrink-0"
+          >
+            <Wand2 className={`h-3 w-3 ${isRefiningDraft ? "animate-spin" : ""}`} />
+            <span>{isRefiningDraft ? "Modifying..." : "Update Draft"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Sender Identity & Action Buttons */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-300/70 pt-3">
+        <div className="flex items-center gap-2 text-xs text-neutral-600">
+          <span>Sending from:</span>
+          <span className="font-semibold text-neutral-800 truncate max-w-[200px] sm:max-w-xs">{senderAccount}</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {Boolean(replyText.trim()) && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClearDraft}
+              className="rounded-full text-xs font-semibold text-neutral-600 hover:bg-black/5 px-3.5 py-2 cursor-pointer"
+            >
+              Clear
+            </Button>
+          )}
+          <Button
+            type="button"
+            disabled={!replyText.trim() || isSending}
+            onClick={onSendReply}
+            className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
+            <span>
+              {isSending
+                ? "Sending..."
+                : email.meetingInfo?.hasMeeting
+                ? "Send & Sync to Calendar"
+                : "Send Reply"}
+            </span>
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -133,21 +372,38 @@ const DraftEditorForm = memo(function DraftEditorForm({
 }: DraftEditorFormProps) {
   const [body, setBody] = useState(email.body)
   const [recipient, setRecipient] = useState(email.recipientEmail || "")
+  const [promptInput, setPromptInput] = useState("")
+  const [isRefining, setIsRefining] = useState(false)
 
   useEffect(() => {
     setBody(email.body)
     setRecipient(email.recipientEmail || "")
   }, [email.id, email.body, email.recipientEmail])
 
+  const handleRefine = async (instructionToUse?: string) => {
+    const p = (instructionToUse || promptInput).trim()
+    if (!p || isRefining) return
+    setIsRefining(true)
+    try {
+      const refined = await refineDraftWithAiPrompt(email, body, p)
+      setBody(refined)
+      setPromptInput("")
+    } catch {
+      // ignore
+    } finally {
+      setIsRefining(false)
+    }
+  }
+
   return (
-    <div className="mt-6 flex flex-col gap-3">
-      <div className="rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4 flex flex-col gap-3">
+    <div className="mt-2 flex flex-col gap-3">
+      <div className="rounded-2xl border border-gray-300/80 bg-[#ececeb] p-4 sm:p-5 shadow-xs flex flex-col gap-3.5">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold text-neutral-600">
+          <div className="text-xs font-bold text-neutral-800">
             Draft Message Content (Edit before sending)
           </div>
           {email.draftId && (
-            <span className="text-[10px] font-mono text-neutral-500 bg-white/70 px-2 py-0.5 rounded-md border border-gray-200">
+            <span className="text-[10px] font-mono text-neutral-600 bg-white/80 px-2 py-0.5 rounded-md border border-gray-200">
               Gmail Draft
             </span>
           )}
@@ -164,24 +420,93 @@ const DraftEditorForm = memo(function DraftEditorForm({
           />
         </div>
 
-        <textarea
-          rows={4}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Draft content..."
-          className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans leading-relaxed"
-        />
-      </div>
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          disabled={isSending}
-          onClick={() => onSend(email.id, body, recipient)}
-          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-        >
-          <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
-          <span>{isSending ? "Sending Draft..." : "Send Draft"}</span>
-        </Button>
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
+              Draft Body
+            </label>
+            {Boolean(body.length) && (
+              <span className="text-[11px] text-neutral-400">
+                {body.length} chars
+              </span>
+            )}
+          </div>
+          <textarea
+            rows={5}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder="Draft content..."
+            className="w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 outline-none focus:border-neutral-500 placeholder:text-neutral-400 font-sans leading-relaxed"
+          />
+        </div>
+
+        {/* AI Prompt Modification Box for Draft */}
+        <div className="rounded-xl border border-gray-300/80 bg-[#f7f7f6] p-3 shadow-2xs">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
+              <Sparkles className="h-3.5 w-3.5 text-neutral-900" />
+              <span>AI Prompt Modification Box</span>
+            </div>
+            <span className="text-[10px] text-neutral-500 font-medium">Powered by Gemini AI</span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+            {[
+              { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
+              { label: "⚡ Make Concise", prompt: "Make the draft concise, brief, and to the point" },
+              { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
+              { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
+              { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
+            ].map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                disabled={isRefining}
+                onClick={() => handleRefine(chip.prompt)}
+                className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={promptInput}
+              onChange={(e) => setPromptInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  handleRefine()
+                }
+              }}
+              placeholder="Type prompt to modify draft..."
+              className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
+            />
+            <button
+              type="button"
+              disabled={isRefining || !promptInput.trim()}
+              onClick={() => handleRefine()}
+              className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer shrink-0"
+            >
+              <Wand2 className={`h-3 w-3 ${isRefining ? "animate-spin" : ""}`} />
+              <span>{isRefining ? "Modifying..." : "Update Draft"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-1">
+          <Button
+            type="button"
+            disabled={isSending || !body.trim()}
+            onClick={() => onSend(email.id, body, recipient)}
+            className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-6 py-2.5 font-semibold shadow-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
+            <span>{isSending ? "Sending Draft..." : "Send Draft"}</span>
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -495,11 +820,11 @@ export default function MailView() {
     return false
   }
 
-  const handleApproveDraft = async (email: Email) => {
+  const handleSendReply = async (email: Email) => {
     const finalContent =
       draftEditText !== null ? draftEditText : email.aiDraft?.suggestedReply || ""
     if (!finalContent.trim()) {
-      triggerToast("Draft message cannot be empty")
+      triggerToast("Reply message cannot be empty")
       return
     }
 
@@ -508,7 +833,7 @@ export default function MailView() {
       const result = await sendGmailMessage({
         to: email.senderEmail,
         subject: email.subject.startsWith("Re:") ? email.subject : `Re: ${email.subject}`,
-        body: finalContent,
+        body: finalContent.trim(),
         threadId: email.threadId,
         senderAccount,
       })
@@ -518,11 +843,15 @@ export default function MailView() {
           triggerToast("Additional Google permission required to send emails.")
           return
         }
-        triggerToast(`Failed to send draft: ${result.error}`)
+        triggerToast(`Failed to send reply: ${result.error}`)
         return
       }
 
-      approveAiDraftAndSend(email.id, finalContent)
+      if (email.aiDraft) {
+        approveAiDraftAndSend(email.id, finalContent.trim())
+      } else {
+        sendReply(email.id, finalContent.trim())
+      }
 
       if (email.meetingInfo?.hasMeeting && email.aiDraft) {
         const isRescheduled =
@@ -531,22 +860,22 @@ export default function MailView() {
 
         await syncMeetingAndRescheduleToCalendar({
           email,
-          slot: email.aiDraft.suggestedSlot,
+          slot: email.aiDraft.suggestedSlot || email.meetingInfo.timing || "Thursday, Oct 31 • 9:30 AM",
           taskTitle: email.aiDraft.suggestedTaskTitle,
           conflictingTitle: email.aiDraft.conflict?.conflictingTitle,
           rescheduledToTime: isRescheduled
             ? { start: 14 * 60, end: 15 * 60, label: "2:00 PM - 3:00 PM" }
             : undefined,
         })
-        triggerToast("Draft sent! Meeting scheduled & synced with Calendar.")
+        triggerToast("Reply sent! Meeting scheduled & synced with Calendar.")
       } else {
-        triggerToast("Draft sent successfully! Copy added to Sent folder.")
+        triggerToast("Reply sent successfully! Copy added to Sent folder.")
       }
 
-      setDraftEditText(null)
+      setDraftEditText("")
     } catch (err: any) {
       if (!handleScopeErrorIfPresent({ error: err?.message })) {
-        triggerToast(`Error sending draft: ${err?.message || "Unknown error"}`)
+        triggerToast(`Error sending reply: ${err?.message || "Unknown error"}`)
       }
     } finally {
       setIsSending(false)
@@ -794,43 +1123,7 @@ export default function MailView() {
   }, [syncGmailAutomatically])
 
 
-  const handleSendManualReply = useCallback(
-    async (emailId: string, replyText: string) => {
-      if (!replyText.trim()) return
-      const targetEmail = emails.find((e) => e.id === emailId)
-      if (!targetEmail) return
 
-      setIsSending(true)
-      try {
-        const result = await sendGmailMessage({
-          to: targetEmail.senderEmail,
-          subject: targetEmail.subject.startsWith("Re:") ? targetEmail.subject : `Re: ${targetEmail.subject}`,
-          body: replyText.trim(),
-          threadId: targetEmail.threadId,
-          senderAccount,
-        })
-
-        if (!result.success && result.error) {
-          if (handleScopeErrorIfPresent(result)) {
-            triggerToast("Additional Google permission required to send.")
-            return
-          }
-          triggerToast(`Failed to send reply: ${result.error}`)
-          return
-        }
-
-        sendReply(emailId, replyText.trim())
-        triggerToast("Reply sent successfully!")
-      } catch (err: any) {
-        if (!handleScopeErrorIfPresent({ error: err?.message })) {
-          triggerToast(`Error sending reply: ${err?.message || "Unknown error"}`)
-        }
-      } finally {
-        setIsSending(false)
-      }
-    },
-    [emails, senderAccount, sendReply]
-  )
 
   const handleSendDraft = useCallback(
     async (draftId: string, textToSend: string, recipientToSend: string) => {
@@ -1803,290 +2096,12 @@ export default function MailView() {
                       {selectedEmail.timestamp}
                     </div>
                   </div>
-
-                  {/* Row 4: On-Demand Contextual Draft Generator (Compact Stable Action) */}
-                  {(!selectedEmail.aiDraft || selectedEmail.aiDraft.status === "dismissed") && !selectedEmail.isDraft && (
-                    <div className="flex items-center justify-between rounded-2xl border border-gray-300 bg-[#ececeb] p-3 sm:p-3.5 shadow-2xs">
-                      <div className="flex items-center gap-2.5 min-w-0 mr-2">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-xs shrink-0">
-                          <Sparkles className="h-3.5 w-3.5" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-neutral-900 truncate">
-                            Generate Contextual AI Draft
-                          </div>
-                          <div className="text-[11px] text-neutral-600 truncate">
-                            Evaluates Calendar &amp; Tasks for timing conflicts and crafts a situation-aware reply
-                          </div>
-                        </div>
-                      </div>
-
-                      <Button
-                        type="button"
-                        disabled={isGeneratingDraft}
-                        onClick={() => handleGenerateContextualDraft(selectedEmail)}
-                        className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-4 py-1.5 font-semibold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
-                      >
-                        <Sparkles className={`mr-1.5 h-3 w-3 ${isGeneratingDraft ? "animate-spin" : ""}`} />
-                        <span>{isGeneratingDraft ? "Drafting..." : "Generate Draft"}</span>
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* SCROLLING MAIL CONTENT: Mail body, active AI draft & reply form scroll smoothly */}
+              {/* SCROLLING MAIL CONTENT: Mail body & Smart Reply Composer scroll smoothly */}
               <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 md:px-8 py-5">
                 <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-
-                {/* AI Auto-Draft Card */}
-                {selectedEmail.aiDraft && selectedEmail.aiDraft.status === "pending_approval" && (
-                  <div className="rounded-2xl border border-gray-300 bg-[#ececeb] p-5 shadow-xs mb-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-xs">
-                          <Sparkles className="h-4 w-4" />
-                        </div>
-                        <div>
-                          <div className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                            <span>AI Contextual Response</span>
-                            {selectedEmail.aiDraft.conflict?.hasConflict && (
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                  selectedEmail.aiDraft.conflict.resolved
-                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
-                                    : "bg-amber-100 text-amber-900 border border-amber-300 animate-pulse"
-                                }`}
-                              >
-                                {selectedEmail.aiDraft.conflict.resolved ? "Conflict Resolved" : "Conflict Detected"}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-neutral-500">
-                            Evaluated against Calendar Events, Goals &amp; To-Do Tasks
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => dismissAiDraft(selectedEmail.id)}
-                        className="text-neutral-400 hover:text-neutral-600 p-1 rounded-full hover:bg-black/5"
-                        title="Dismiss AI Draft"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
-
-                    {/* Schedule Conflict Alert & Resolution Controls */}
-                    {selectedEmail.aiDraft.conflict?.hasConflict && (
-                      <div
-                        className={`mt-3.5 rounded-xl border p-3.5 transition-all ${
-                          selectedEmail.aiDraft.conflict.resolved
-                            ? "border-emerald-300 bg-emerald-500/10 text-emerald-950"
-                            : "border-amber-300 bg-amber-500/10 text-amber-950"
-                        }`}
-                      >
-                        <div className="flex items-start gap-2.5">
-                          {selectedEmail.aiDraft.conflict.resolved ? (
-                            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                          ) : (
-                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                          )}
-                          <div className="flex-1 text-xs">
-                            <div className="flex items-center justify-between">
-                              <span className="font-bold">
-                                {selectedEmail.aiDraft.conflict.resolved
-                                  ? "Schedule Conflict Resolved"
-                                  : "Schedule Conflict Detected"}
-                              </span>
-                              <span
-                                className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                  selectedEmail.aiDraft.conflict.resolved
-                                    ? "bg-emerald-200 text-emerald-800"
-                                    : "bg-amber-200 text-amber-900"
-                                }`}
-                              >
-                                {selectedEmail.aiDraft.conflict.resolved ? "Synced" : "Action Needed"}
-                              </span>
-                            </div>
-
-                            <p className="mt-1 text-neutral-700 leading-relaxed">
-                              {selectedEmail.aiDraft.conflict.resolved
-                                ? selectedEmail.aiDraft.conflict.resolutionType === "rescheduled_conflicting"
-                                  ? `Conflicting task "${selectedEmail.aiDraft.conflict.conflictingTitle}" has been moved to 2:00 PM in your Calendar & To-Do list. Meeting confirmed for 9:30 AM.`
-                                  : `Proposed alternative open slot (${selectedEmail.aiDraft.conflict.alternativeSlot}) has been set in your drafted reply.`
-                                : `The requested meeting conflicts with scheduled ${selectedEmail.aiDraft.conflict.conflictingType} "${selectedEmail.aiDraft.conflict.conflictingTitle}" (${selectedEmail.aiDraft.conflict.conflictingTime}). Choose how to manage it:`}
-                            </p>
-
-                            {!selectedEmail.aiDraft.conflict.resolved && (
-                              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleResolveConflictWithAlternative(selectedEmail)}
-                                  className="flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 shadow-xs hover:bg-neutral-50 active:scale-95 transition-all cursor-pointer"
-                                >
-                                  <Clock className="h-3.5 w-3.5 text-amber-600" />
-                                  <span>Propose Alternative ({selectedEmail.aiDraft.conflict.alternativeSlot.split("•")[1]?.trim() || "11:30 AM"})</span>
-                                </button>
-
-                                <button
-                                  type="button"
-                                  onClick={() => handleAcceptAndRescheduleConflict(selectedEmail)}
-                                  className="flex items-center gap-1.5 rounded-lg border border-amber-400 bg-neutral-900 px-3 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all cursor-pointer"
-                                >
-                                  <Calendar className="h-3.5 w-3.5 text-amber-400" />
-                                  <span>Accept &amp; Reschedule Task to 2:00 PM</span>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Proposed Slot & Linked Task Previews */}
-                    <div className="mt-3.5 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                      {selectedEmail.meetingInfo?.hasMeeting && selectedEmail.aiDraft.suggestedSlot && (
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2.5 text-neutral-800">
-                          <Calendar className="h-4 w-4 text-neutral-600 shrink-0" />
-                          <div>
-                            <div className="font-semibold text-neutral-900">Meeting Slot</div>
-                            <div className="text-[11px] text-neutral-600">
-                              {selectedEmail.aiDraft.suggestedSlot}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      {selectedEmail.aiDraft.suggestedTaskTitle && (
-                        <div className="flex items-center gap-2 rounded-xl border border-gray-300/70 bg-white/90 p-2.5 text-neutral-800">
-                          <CheckSquare className="h-4 w-4 text-neutral-600 shrink-0" />
-                          <div>
-                            <div className="font-semibold text-neutral-900">Linked Action Item</div>
-                            <div className="text-[11px] text-neutral-600 truncate">
-                              {selectedEmail.aiDraft.suggestedTaskTitle}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Draft Body Editable */}
-                    <div className="mt-3.5">
-                      <label className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                        Draft Message Text
-                      </label>
-                      <textarea
-                        rows={5}
-                        value={
-                          draftEditText !== null
-                            ? draftEditText
-                            : selectedEmail.aiDraft.suggestedReply
-                        }
-                        onChange={(e) => setDraftEditText(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-gray-300/80 bg-white p-3 text-sm text-neutral-800 leading-relaxed outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400 font-normal"
-                      />
-                    </div>
-
-                    {/* Interactive AI Changing Box ("Ask AI to Change Draft") */}
-                    <div className="mt-3.5 rounded-xl border border-gray-300/80 bg-[#f7f7f6] p-3 shadow-2xs">
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
-                          <Sparkles className="h-3.5 w-3.5 text-neutral-900" />
-                          <span>AI Prompt Modification Box</span>
-                        </div>
-                        <span className="text-[10px] text-neutral-500 font-medium">Powered by Gemini AI</span>
-                      </div>
-
-                      {/* Quick prompt suggestion chips */}
-                      <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
-                        {[
-                          { label: "✨ More Polite", prompt: "Make the tone warmer, more polite, and express appreciation" },
-                          { label: "⚡ Make Concise", prompt: "Make the reply concise, brief, and to the point (2-3 sentences max)" },
-                          { label: "💼 Professional", prompt: "Make the draft more formal, executive, and professional" },
-                          ...(selectedEmail.meetingInfo?.hasMeeting
-                            ? [
-                                { label: "⏱️ Propose 30 Mins", prompt: "Ask if we can keep the sync to 30 minutes instead of 45 minutes" },
-                                { label: "📅 Suggest Friday", prompt: "Politely ask to reschedule for Friday morning at 10:00 AM instead" },
-                              ]
-                            : [
-                                { label: "📝 Request More Details", prompt: "Politely ask for any additional documentation or context" },
-                                { label: "✅ Confirm Next Steps", prompt: "Confirm agreement and outline immediate next steps" },
-                              ]),
-                        ].map((chip) => (
-                          <button
-                            key={chip.label}
-                            type="button"
-                            disabled={isRefiningDraft}
-                            onClick={() => handleRefineDraftWithPrompt(chip.prompt)}
-                            className="rounded-full border border-gray-300/90 bg-white px-2.5 py-1 text-[11px] font-medium text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
-                          >
-                            {chip.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Custom Prompt Input & Refine Button */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={aiPromptInstruction}
-                          onChange={(e) => setAiPromptInstruction(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault()
-                              handleRefineDraftWithPrompt()
-                            }
-                          }}
-                          placeholder="Type prompt to change draft (e.g. 'Add request for slide deck', 'Sound more casual')..."
-                          className="flex-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-neutral-800 placeholder:text-neutral-400 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-400"
-                        />
-                        <button
-                          type="button"
-                          disabled={isRefiningDraft || !aiPromptInstruction.trim()}
-                          onClick={() => handleRefineDraftWithPrompt()}
-                          className="flex items-center gap-1.5 rounded-lg bg-neutral-900 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-neutral-800 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
-                        >
-                          <Wand2 className={`h-3 w-3 ${isRefiningDraft ? "animate-spin" : ""}`} />
-                          <span>{isRefiningDraft ? "Modifying..." : "Update Draft"}</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Sender Identity & Action Buttons */}
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-gray-300/70 pt-3">
-                      <div className="flex items-center gap-2 text-xs text-neutral-600">
-                        <span>Sending from:</span>
-                        <span className="font-semibold text-neutral-800">{senderAccount}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => dismissAiDraft(selectedEmail.id)}
-                          className="rounded-full text-xs font-semibold text-neutral-600 hover:bg-black/5 px-4 py-2 cursor-pointer"
-                        >
-                          Dismiss
-                        </Button>
-                        <Button
-                          type="button"
-                          disabled={isSending}
-                          onClick={() => handleApproveDraft(selectedEmail)}
-                          className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 shadow-md text-xs px-5 py-2 font-semibold transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                        >
-                          <Send className={`h-3.5 w-3.5 ${isSending ? "animate-pulse" : ""}`} />
-                          <span>
-                            {isSending
-                              ? "Sending..."
-                              : selectedEmail.meetingInfo?.hasMeeting
-                              ? "Send & Sync to Calendar"
-                              : "Send Draft"}
-                          </span>
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* Email Content Body (Rich HTML or Typographic Text, hidden for drafts to maximize typing responsiveness) */}
                 {!selectedEmail.isDraft && (
@@ -2104,11 +2119,31 @@ export default function MailView() {
                     onSend={handleSendDraft}
                   />
                 ) : (
-                  <ManualReplyForm
-                    emailId={selectedEmail.id}
+                  <SmartReplyComposer
+                    email={selectedEmail}
                     senderAccount={senderAccount}
+                    replyText={
+                      draftEditText !== null
+                        ? draftEditText
+                        : selectedEmail.aiDraft?.suggestedReply || ""
+                    }
+                    onReplyTextChange={(val) => setDraftEditText(val)}
+                    isGeneratingDraft={isGeneratingDraft}
+                    isRefiningDraft={isRefiningDraft}
                     isSending={isSending}
-                    onSend={handleSendManualReply}
+                    onGenerateDraft={() => handleGenerateContextualDraft(selectedEmail)}
+                    onRefineWithPrompt={handleRefineDraftWithPrompt}
+                    aiPromptInstruction={aiPromptInstruction}
+                    onAiPromptInstructionChange={setAiPromptInstruction}
+                    onResolveAlternative={() => handleResolveConflictWithAlternative(selectedEmail)}
+                    onAcceptAndReschedule={() => handleAcceptAndRescheduleConflict(selectedEmail)}
+                    onClearDraft={() => {
+                      setDraftEditText("")
+                      if (selectedEmail.aiDraft) {
+                        dismissAiDraft(selectedEmail.id)
+                      }
+                    }}
+                    onSendReply={() => handleSendReply(selectedEmail)}
                   />
                 )}
               </div>
