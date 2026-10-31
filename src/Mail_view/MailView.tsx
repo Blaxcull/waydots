@@ -1351,45 +1351,46 @@ export default function MailView() {
           /* VIEW 2: SPLIT VIEW (Left: Opened Email Conversation, Right: Mailbox Overview List) */
           <>
             {/* LEFT COLUMN: Opened Email Conversation & Actions */}
-            <div className="flex flex-1 flex-col overflow-y-auto bg-neutral-100/90 p-4 sm:p-6 md:p-8">
-              {/* Back to Full List Button Header */}
-              <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => selectEmail(null)}
-                  className="rounded-full border border-gray-300/80 bg-[#e7e7e6] hover:bg-[#dddddc] text-[#404040] text-xs font-semibold px-4 py-2 shadow-xs transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Back to {folderTitle} Overview
-                </Button>
+            <div className="flex flex-1 flex-col h-full min-h-0 overflow-hidden bg-neutral-100/90">
+              {/* STABLE HEADER: Always pinned at the top, does NOT scroll */}
+              <div className="shrink-0 border-b border-gray-200/90 bg-neutral-100/95 px-4 sm:px-6 md:px-8 pt-4 pb-3.5 sm:pb-4 backdrop-blur-sm z-10">
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 sm:gap-3.5">
+                  {/* Row 1: Back to Full List Button & Priority Header */}
+                  <div className="flex items-center justify-between">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => selectEmail(null)}
+                      className="rounded-full border border-gray-300/80 bg-[#e7e7e6] hover:bg-[#dddddc] text-[#404040] text-xs font-semibold px-4 py-2 shadow-xs transition-all duration-200 hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Back to {folderTitle} Overview
+                    </Button>
 
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      selectedEmail.priority === "high"
-                        ? "bg-rose-100 text-rose-700 border border-rose-300"
-                        : selectedEmail.priority === "medium"
-                        ? "bg-amber-100 text-amber-700 border border-amber-300"
-                        : "bg-emerald-100 text-emerald-700 border border-emerald-300"
-                    }`}
-                  >
-                    Priority: {selectedEmail.priority.toUpperCase()}
-                  </span>
-                  <span className="text-xs font-medium text-neutral-400">
-                    {folderTitle}
-                  </span>
-                </div>
-              </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          selectedEmail.priority === "high"
+                            ? "bg-rose-100 text-rose-700 border border-rose-300"
+                            : selectedEmail.priority === "medium"
+                            ? "bg-amber-100 text-amber-700 border border-amber-300"
+                            : "bg-emerald-100 text-emerald-700 border border-emerald-300"
+                        }`}
+                      >
+                        Priority: {selectedEmail.priority.toUpperCase()}
+                      </span>
+                      <span className="text-xs font-medium text-neutral-400">
+                        {folderTitle}
+                      </span>
+                    </div>
+                  </div>
 
-              <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 pt-5">
-                {/* Header */}
-                <div className="border-b border-gray-200 pb-5">
+                  {/* Row 2: Subject & Actions */}
                   <div className="flex items-start justify-between gap-4">
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-neutral-800">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-neutral-800 line-clamp-2">
                       {selectedEmail.subject}
                     </h1>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         type="button"
                         onClick={() => toggleStarEmail(selectedEmail.id)}
@@ -1418,7 +1419,7 @@ export default function MailView() {
 
                   {/* Meeting Details Bar if present */}
                   {selectedEmail.meetingInfo?.hasMeeting && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/80 p-2.5 text-xs text-neutral-700">
+                    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white/80 p-2.5 text-xs text-neutral-700">
                       <div className="flex items-center gap-1.5 font-semibold text-neutral-900">
                         <Calendar className="h-4 w-4 text-neutral-700" />
                         <span>Detected Meeting:</span>
@@ -1442,25 +1443,60 @@ export default function MailView() {
                     </div>
                   )}
 
-                  <div className="mt-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-sm text-neutral-700 shadow-inner">
+                  {/* Row 3: Sender Avatar, Name, Email & Timestamp */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-sm text-neutral-700 shadow-inner shrink-0">
                         {selectedEmail.senderName.charAt(0)}
                       </div>
-                      <div>
-                        <div className="text-sm font-semibold text-neutral-900">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-neutral-900 truncate">
                           {selectedEmail.senderName}
                         </div>
-                        <div className="text-xs text-neutral-500">
+                        <div className="text-xs text-neutral-500 truncate">
                           {selectedEmail.senderEmail}
                         </div>
                       </div>
                     </div>
-                    <div className="text-xs font-medium text-neutral-400 tabular-nums">
+                    <div className="text-xs font-medium text-neutral-400 tabular-nums shrink-0">
                       {selectedEmail.timestamp}
                     </div>
                   </div>
+
+                  {/* Row 4: On-Demand Contextual Draft Generator (Compact Stable Action) */}
+                  {(!selectedEmail.aiDraft || selectedEmail.aiDraft.status === "dismissed") && !selectedEmail.isDraft && (
+                    <div className="flex items-center justify-between rounded-2xl border border-gray-300 bg-[#ececeb] p-3 sm:p-3.5 shadow-2xs">
+                      <div className="flex items-center gap-2.5 min-w-0 mr-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-xs shrink-0">
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-neutral-900 truncate">
+                            Generate Contextual AI Draft
+                          </div>
+                          <div className="text-[11px] text-neutral-600 truncate">
+                            Evaluates Calendar &amp; Tasks for timing conflicts and crafts a situation-aware reply
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button
+                        type="button"
+                        disabled={isGeneratingDraft}
+                        onClick={() => handleGenerateContextualDraft(selectedEmail)}
+                        className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-4 py-1.5 font-semibold transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+                      >
+                        <Sparkles className={`mr-1.5 h-3 w-3 ${isGeneratingDraft ? "animate-spin" : ""}`} />
+                        <span>{isGeneratingDraft ? "Drafting..." : "Generate Draft"}</span>
+                      </Button>
+                    </div>
+                  )}
                 </div>
+              </div>
+
+              {/* SCROLLING MAIL CONTENT: Mail body, active AI draft & reply form scroll smoothly */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 md:px-8 py-5">
+                <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
 
                 {/* AI Auto-Draft Card */}
                 {selectedEmail.aiDraft && selectedEmail.aiDraft.status === "pending_approval" && (
@@ -1697,35 +1733,6 @@ export default function MailView() {
                   </div>
                 )}
 
-                {/* If Email has NO active draft: Show On-Demand Contextual Draft Generator */}
-                {(!selectedEmail.aiDraft || selectedEmail.aiDraft.status === "dismissed") && !selectedEmail.isDraft && (
-                  <div className="mb-5 flex items-center justify-between rounded-2xl border border-gray-300 bg-[#ececeb] p-3.5 shadow-2xs">
-                    <div className="flex items-center gap-2.5">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-xs">
-                        <Sparkles className="h-3.5 w-3.5" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-neutral-900">
-                          Generate Contextual AI Draft
-                        </div>
-                        <div className="text-[11px] text-neutral-600">
-                          Evaluates Calendar &amp; Tasks for timing conflicts and crafts a situation-aware reply
-                        </div>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="button"
-                      disabled={isGeneratingDraft}
-                      onClick={() => handleGenerateContextualDraft(selectedEmail)}
-                      className="rounded-full bg-neutral-900 text-white hover:bg-neutral-800 text-xs px-4 py-1.5 font-semibold transition-all shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <Sparkles className={`mr-1.5 h-3 w-3 ${isGeneratingDraft ? "animate-spin" : ""}`} />
-                      <span>{isGeneratingDraft ? "Drafting..." : "Generate Draft"}</span>
-                    </Button>
-                  </div>
-                )}
-
                 {/* Email Content Body (Rich HTML or Typographic Text) */}
                 <EmailHtmlViewer
                   html={selectedEmail.htmlBody}
@@ -1770,8 +1777,9 @@ export default function MailView() {
                 )}
               </div>
             </div>
+          </div>
 
-            {/* RIGHT COLUMN: Mailbox Overview List */}
+          {/* RIGHT COLUMN: Mailbox Overview List */}
             <div className="hidden md:flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-l border-gray-300/70 bg-[#ececeb]">
               {/* Header with expand to full page button */}
               <div className="flex items-center justify-between border-b border-gray-300/70 px-4 py-3 bg-[#e7e7e6]">
