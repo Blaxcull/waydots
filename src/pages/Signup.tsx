@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
 import { AuthRedirect } from '@/components/AuthRedirect'
+import { GOOGLE_OAUTH_SCOPES } from '@/services/gmailApiService'
 
 function Logo({ className = "h-8 w-8" }: { className?: string }) {
   return <img src="/applogo.png" alt="Waydots" className={className} />;
@@ -54,12 +55,12 @@ function SignupContent() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+          scopes: GOOGLE_OAUTH_SCOPES,
           redirectTo: `${redirectOrigin}/today`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            scope: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+            scope: GOOGLE_OAUTH_SCOPES,
           },
         },
       })

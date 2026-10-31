@@ -91,6 +91,58 @@ describe("gmailApiService decoding and HTML extraction", () => {
     expect(htmlBody).toBe("<p>Nested <strong>HTML</strong></p>")
   })
 
+  it("extracts inline CID images and converts them to base64 data URIs", () => {
+    // base64 encoded "image-bytes-mock"
+    const rawImageBytes = "aW1hZ2UtYnl0ZXMtbW9jaw=="
+    const htmlWithCid = encodeGmailBase64(
+      '<p>Here is the attachment: <img src="cid:chart.png" alt="chart"/></p>'
+    )
+
+    const payload = {
+      mimeType: "multipart/related",
+      parts: [
+        {
+          mimeType: "text/html",
+          body: {
+            data: htmlWithCid,
+          },
+        },
+        {
+          mimeType: "image/png",
+          filename: "chart.png",
+          headers: [
+            { name: "Content-ID", value: "<chart.png>" },
+            { name: "Content-Disposition", value: 'inline; filename="chart.png"' },
+          ],
+          body: {
+            data: rawImageBytes,
+          },
+        },
+      ],
+    }
+
+    const { htmlBody } = extractEmailBodies(payload)
+    expect(htmlBody).toContain('src="data:image/png;base64,aW1hZ2UtYnl0ZXMtbW9jaw=="')
+  })
+
+  it("provides fallback for Mailer-Daemon delivery failure bounce icon if not resolved as inline CID", () => {
+    const htmlWithBounce = encodeGmailBase64(
+      '<div><b>Address not found</b><img src="cid:icon.png" alt="Error"/></div>'
+    )
+
+    const payload = {
+      mimeType: "text/html",
+      body: {
+        data: htmlWithBounce,
+      },
+    }
+
+    const { htmlBody } = extractEmailBodies(payload)
+    expect(htmlBody).toContain(
+      'src="https://www.gstatic.com/images/icons/material/system/2x/help_outline_amber_48dp.png"'
+    )
+  })
+
   describe("fetchAllGmailFolders one-click synchronization", () => {
     const originalFetch = globalThis.fetch
 

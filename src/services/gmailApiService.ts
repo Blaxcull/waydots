@@ -3,7 +3,13 @@ import type { Email } from "@/store/emailStore"
 import { classifyEmailsWithKeywords } from "@/services/geminiMailService"
 
 /**
- * Initiates Google OAuth with Gmail Read, Send, and Compose/Draft permissions via Supabase.
+ * All required Google OAuth scopes for full Gmail integration (read, send, compose, and modify).
+ */
+export const GOOGLE_OAUTH_SCOPES =
+  "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.modify"
+
+/**
+ * Initiates Google OAuth with Gmail Read, Send, Compose, and Modify permissions via Supabase.
  */
 export async function connectGmailAccount(): Promise<{ error?: string }> {
   try {
@@ -12,8 +18,7 @@ export async function connectGmailAccount(): Promise<{ error?: string }> {
       localStorage.removeItem("google_provider_token_rejected")
     }
     const origin = window.location.origin
-    const scopes =
-      "openid email profile https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.compose"
+    const scopes = GOOGLE_OAUTH_SCOPES
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -136,12 +141,17 @@ export function extractEmailBodies(payload: any): { plainText: string; htmlBody:
 
   let plainText = ""
   let htmlBody = ""
+  const inlineImages = new Map<string, { mime: string; data: string }>()
 
   function traverse(part: any) {
     if (!part) return
 
     const mime = (part.mimeType || "").toLowerCase()
     const data = part.body?.data
+    const headers: Array<{ name: string; value: string }> = part.headers || []
+
+    const getHeader = (name: string) =>
+      headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ""
 
     if (mime === "text/plain" && data) {
       const decoded = decodeGmailBase64(data)
@@ -149,6 +159,39 @@ export function extractEmailBodies(payload: any): { plainText: string; htmlBody:
     } else if (mime === "text/html" && data) {
       const decoded = decodeGmailBase64(data)
       htmlBody = htmlBody ? `${htmlBody}<br/>${decoded}` : decoded
+    } else if (data && (mime.startsWith("image/") || part.filename?.match(/\.(png|jpe?g|gif|webp|svg)$/i))) {
+      const contentId = getHeader("content-id")
+      const attachmentId = getHeader("x-attachment-id")
+      const filename = part.filename || ""
+
+      const effectiveMime = mime.startsWith("image/")
+        ? mime
+        : filename.toLowerCase().endsWith(".png")
+          ? "image/png"
+          : filename.toLowerCase().endsWith(".gif")
+            ? "image/gif"
+            : filename.toLowerCase().endsWith(".svg")
+              ? "image/svg+xml"
+              : "image/jpeg"
+
+      let cleanData = data.replace(/-/g, "+").replace(/_/g, "/")
+      while (cleanData.length % 4 !== 0) {
+        cleanData += "="
+      }
+
+      const imgInfo = { mime: effectiveMime, data: cleanData }
+
+      if (contentId) {
+        const cleanCid = contentId.replace(/^<|>$/g, "").trim().toLowerCase()
+        inlineImages.set(cleanCid, imgInfo)
+        inlineImages.set(contentId.trim().toLowerCase(), imgInfo)
+      }
+      if (attachmentId) {
+        inlineImages.set(attachmentId.trim().toLowerCase(), imgInfo)
+      }
+      if (filename) {
+        inlineImages.set(filename.trim().toLowerCase(), imgInfo)
+      }
     }
 
     if (part.parts && Array.isArray(part.parts)) {
@@ -159,6 +202,27 @@ export function extractEmailBodies(payload: any): { plainText: string; htmlBody:
   }
 
   traverse(payload)
+
+  // Replace inline cid: references in HTML with their data URIs
+  if (htmlBody) {
+    htmlBody = htmlBody.replace(
+      /(src|href|poster|background)\s*=\s*(["'])cid:(?:<)?([^"'>]+?)(?:>)?\2/gi,
+      (fullMatch, attr, quote, cidVal) => {
+        const key = cidVal.trim().toLowerCase()
+        const found = inlineImages.get(key)
+        if (found) {
+          return `${attr}=${quote}data:${found.mime};base64,${found.data}${quote}`
+        }
+        return fullMatch
+      }
+    )
+
+    // Fallback for Mailer-Daemon delivery failure bounce icon if not resolved as inline CID
+    htmlBody = htmlBody.replace(
+      /(src|href|poster|background)\s*=\s*(["'])cid:(?:<)?icon\.png(?:>)?\2/gi,
+      `$1=$2https://www.gstatic.com/images/icons/material/system/2x/help_outline_amber_48dp.png$2`
+    )
+  }
 
   // If plainText is missing but htmlBody exists, strip tags cleanly for search/snippets/AI
   if (!plainText && htmlBody) {
@@ -182,7 +246,10 @@ export function extractEmailBodies(payload: any): { plainText: string; htmlBody:
 /**
  * Helper to fetch and parse JSON from Gmail API with Authorization header
  */
-async function fetchGmailJson<T>(url: string, accessToken: string): Promise<T | null> {
+async function fetchGmailJson<T>(
+  url: string,
+  accessToken: string
+): Promise<{ data: T | null; status: number; ok: boolean }> {
   try {
     const res = await fetch(url, {
       headers: {
@@ -191,11 +258,12 @@ async function fetchGmailJson<T>(url: string, accessToken: string): Promise<T | 
       },
     })
     if (!res.ok) {
-      return null
+      return { data: null, status: res.status, ok: false }
     }
-    return (await res.json()) as T
+    const data = (await res.json()) as T
+    return { data, status: res.status, ok: true }
   } catch {
-    return null
+    return { data: null, status: 0, ok: false }
   }
 }
 
@@ -659,6 +727,21 @@ export async function fetchAllGmailFolders(
     ),
   ])
 
+  // Check if any folder query failed due to invalid token or insufficient scopes
+  const authForbidden = [inboxRes, starredRes, sentRes, draftMsgRes, draftsListRes].some(
+    (r) => r.status === "fulfilled" && (r.value.status === 401 || r.value.status === 403)
+  )
+  if (authForbidden) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("google_provider_token")
+      localStorage.setItem("google_provider_token_rejected", "true")
+    }
+    const scopeErr = new Error("GMAIL_INSUFFICIENT_SCOPES: Google authorization expired or insufficient scopes")
+    ;(scopeErr as any).status = 403
+    ;(scopeErr as any).code = "GMAIL_INSUFFICIENT_SCOPES"
+    throw scopeErr
+  }
+
   // 3. Deduplicate message IDs and accumulate folder membership tags
   const itemMap = new Map<string, MessageItemMeta>()
 
@@ -676,20 +759,20 @@ export async function fetchAllGmailFolders(
     itemMap.set(id, cur)
   }
 
-  if (inboxRes.status === "fulfilled" && inboxRes.value?.messages) {
-    for (const m of inboxRes.value.messages) recordItem(m.id, m.threadId, "isInbox")
+  if (inboxRes.status === "fulfilled" && inboxRes.value?.data?.messages) {
+    for (const m of inboxRes.value.data.messages) recordItem(m.id, m.threadId, "isInbox")
   }
-  if (starredRes.status === "fulfilled" && starredRes.value?.messages) {
-    for (const m of starredRes.value.messages) recordItem(m.id, m.threadId, "isStarred")
+  if (starredRes.status === "fulfilled" && starredRes.value?.data?.messages) {
+    for (const m of starredRes.value.data.messages) recordItem(m.id, m.threadId, "isStarred")
   }
-  if (sentRes.status === "fulfilled" && sentRes.value?.messages) {
-    for (const m of sentRes.value.messages) recordItem(m.id, m.threadId, "isSent")
+  if (sentRes.status === "fulfilled" && sentRes.value?.data?.messages) {
+    for (const m of sentRes.value.data.messages) recordItem(m.id, m.threadId, "isSent")
   }
-  if (draftMsgRes.status === "fulfilled" && draftMsgRes.value?.messages) {
-    for (const m of draftMsgRes.value.messages) recordItem(m.id, m.threadId, "isDraft")
+  if (draftMsgRes.status === "fulfilled" && draftMsgRes.value?.data?.messages) {
+    for (const m of draftMsgRes.value.data.messages) recordItem(m.id, m.threadId, "isDraft")
   }
-  if (draftsListRes.status === "fulfilled" && draftsListRes.value?.drafts) {
-    for (const d of draftsListRes.value.drafts) {
+  if (draftsListRes.status === "fulfilled" && draftsListRes.value?.data?.drafts) {
+    for (const d of draftsListRes.value.data.drafts) {
       const msgId = d.message?.id || d.id
       recordItem(msgId, d.message?.threadId, "isDraft", d.id)
     }
@@ -703,22 +786,34 @@ export async function fetchAllGmailFolders(
   // 4. Fetch full details in parallel batches of 10 to minimize latency & respect rate limits
   const batchSize = 10
   const fetchedEmails: Email[] = []
+  let authErrorDetected = false
 
   for (let i = 0; i < itemsToFetch.length; i += batchSize) {
+    if (authErrorDetected) break
+
     const chunk = itemsToFetch.slice(i, i + batchSize)
     const chunkPromises = chunk.map(async (meta) => {
       try {
-        let msg = await fetchGmailJson<any>(
+        const msgRes = await fetchGmailJson<any>(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${meta.id}?format=full`,
           accessToken
         )
+        if (msgRes.status === 401 || msgRes.status === 403) {
+          authErrorDetected = true
+          return null
+        }
+        let msg = msgRes.data
         if (!msg && meta.draftId) {
-          const draftObj = await fetchGmailJson<any>(
+          const draftRes = await fetchGmailJson<any>(
             `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${meta.draftId}?format=full`,
             accessToken
           )
-          if (draftObj?.message) {
-            msg = draftObj.message
+          if (draftRes.status === 401 || draftRes.status === 403) {
+            authErrorDetected = true
+            return null
+          }
+          if (draftRes.data?.message) {
+            msg = draftRes.data.message
           }
         }
         if (!msg) return null
@@ -813,6 +908,17 @@ export async function fetchAllGmailFolders(
     for (const item of chunkResults) {
       if (item) fetchedEmails.push(item)
     }
+  }
+
+  if (authErrorDetected) {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("google_provider_token")
+      localStorage.setItem("google_provider_token_rejected", "true")
+    }
+    const scopeErr = new Error("GMAIL_INSUFFICIENT_SCOPES: Google authorization expired or insufficient scopes")
+    ;(scopeErr as any).status = 403
+    ;(scopeErr as any).code = "GMAIL_INSUFFICIENT_SCOPES"
+    throw scopeErr
   }
 
   // Automatically classify priorities & meetings with keyword intelligence

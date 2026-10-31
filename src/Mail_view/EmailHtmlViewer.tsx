@@ -26,11 +26,41 @@ function EmailHtmlViewerComponent({
     if (!rawHtml) return ""
 
     // Strip all executable scripts and inline event handlers to prevent sandbox blocked execution warnings
-    const sanitizedHtml = rawHtml
+    let sanitizedHtml = rawHtml
       .replace(/<script\b[\s\S]*?<\/script>/gi, "")
       .replace(/\s(on\w+)\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, "")
       .replace(/href\s*=\s*["']?javascript:[^"'>]*/gi, "")
 
+    // Fix semicolon in viewport meta tags: ';' is not a valid separator in HTML meta content
+    sanitizedHtml = sanitizedHtml.replace(
+      /(<meta\s+[^>]*name=["']viewport["'][^>]*content=["'])([^"']*)(["'][^>]*>)/gi,
+      (_match, p1, content, p3) => `${p1}${content.replace(/;/g, ",")}${p3}`
+    )
+
+    // Convert protocol-relative URLs (//example.com) to https (https://example.com)
+    // In srcdoc iframe (about:srcdoc), "//" inherits "about:" scheme and fails with ERR_UNKNOWN_URL_SCHEME
+    sanitizedHtml = sanitizedHtml
+      .replace(/(src|href|poster|background)\s*=\s*(["'])(\/\/[^"'>]+)\2/gi, (_match, attr, quote, url) => {
+        return `${attr}=${quote}https:${url}${quote}`
+      })
+      .replace(/(src|href|poster|background)\s*=\s*(\/\/[^\s>]+)/gi, (_match, attr, url) => {
+        return `${attr}="https:${url}"`
+      })
+      .replace(/srcset\s*=\s*(["'])(.*?)\1/gi, (_match, quote, val) => {
+        const updated = val.replace(/(^|[\s,])\/\/([^\s,]+)/g, "$1https://$2")
+        return `srcset=${quote}${updated}${quote}`
+      })
+      .replace(/url\(\s*(['"]?)(\/\/[^)'"]+)\1\s*\)/gi, (_match, quote, url) => {
+        return `url(${quote}https:${url}${quote})`
+      })
+
+    // Fallback for Mailer-Daemon delivery failure bounce icon if not resolved as inline CID
+    sanitizedHtml = sanitizedHtml.replace(
+      /(src|href|poster|background)\s*=\s*(["'])cid:(?:<)?icon\.png(?:>)?\2/gi,
+      `$1=$2https://www.gstatic.com/images/icons/material/system/2x/help_outline_amber_48dp.png$2`
+    )
+
+    const metaTags = '<meta charset="utf-8"/><meta name="referrer" content="no-referrer"/>'
     const baseTag = '<base target="_blank">'
     const responsiveStyle = `
       <style>
@@ -73,13 +103,13 @@ function EmailHtmlViewerComponent({
     `
 
     if (sanitizedHtml.toLowerCase().includes("<html")) {
-      if (sanitizedHtml.toLowerCase().includes("<head>")) {
-        return sanitizedHtml.replace(/<head>/i, `<head>${baseTag}${responsiveStyle}`)
+      if (sanitizedHtml.toLowerCase().includes("<head")) {
+        return sanitizedHtml.replace(/<head[^>]*>/i, `$&${metaTags}${baseTag}${responsiveStyle}`)
       }
-      return sanitizedHtml.replace(/<html[^>]*>/i, `$&<head>${baseTag}${responsiveStyle}</head>`)
+      return sanitizedHtml.replace(/<html[^>]*>/i, `$&<head>${metaTags}${baseTag}${responsiveStyle}</head>`)
     }
 
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/>${baseTag}${responsiveStyle}</head><body>${sanitizedHtml}</body></html>`
+    return `<!DOCTYPE html><html><head>${metaTags}${baseTag}${responsiveStyle}</head><body>${sanitizedHtml}</body></html>`
   }, [rawHtml])
 
   const updateHeight = useCallback(() => {
@@ -114,6 +144,13 @@ function EmailHtmlViewerComponent({
       if (doc?.body && typeof ResizeObserver !== "undefined") {
         ro = new ResizeObserver(() => updateHeight())
         ro.observe(doc.body)
+      }
+      if (doc) {
+        const images = doc.querySelectorAll("img")
+        images.forEach((img) => {
+          img.addEventListener("load", updateHeight, { once: true })
+          img.addEventListener("error", updateHeight, { once: true })
+        })
       }
     } catch {
       // Ignore

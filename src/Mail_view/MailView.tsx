@@ -793,14 +793,6 @@ export default function MailView() {
     }
   }, [syncGmailAutomatically])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const handleFocus = () => {
-      void syncGmailAutomatically(true)
-    }
-    window.addEventListener("focus", handleFocus)
-    return () => window.removeEventListener("focus", handleFocus)
-  }, [syncGmailAutomatically])
 
   const handleSendManualReply = useCallback(
     async (emailId: string, replyText: string) => {
