@@ -37,4 +37,18 @@ describe("EmailHtmlViewer", () => {
     render(<EmailHtmlViewer plainText="<div><h3>Hello from HTML</h3></div>" />)
     expect(screen.getByTitle("Email Message Content")).toBeInTheDocument()
   })
+
+  it("replaces Mailer-Daemon delivery failure bounce icon (cid:icon.png) with inline SVG data URI", () => {
+    render(
+      <EmailHtmlViewer
+        html='<div><b>Address not found</b><img src="cid:icon.png" alt="Error Icon"/></div>'
+      />
+    )
+    const iframe = screen.getByTitle("Email Message Content") as HTMLIFrameElement
+    expect(iframe).toBeInTheDocument()
+    const srcDoc = iframe.getAttribute("srcdoc") || ""
+    expect(srcDoc).not.toContain("cid:icon.png")
+    expect(srcDoc).toContain("data:image/svg+xml;utf8")
+    expect(srcDoc).toContain("upgrade-insecure-requests")
+  })
 })

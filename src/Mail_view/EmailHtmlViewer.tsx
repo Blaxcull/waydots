@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react"
+import { GMAIL_BOUNCE_ICON_DATA_URI } from "@/services/gmailApiService"
 
 interface EmailHtmlViewerProps {
   html?: string
@@ -55,12 +56,27 @@ function EmailHtmlViewerComponent({
       })
 
     // Fallback for Mailer-Daemon delivery failure bounce icon if not resolved as inline CID
-    sanitizedHtml = sanitizedHtml.replace(
-      /(src|href|poster|background)\s*=\s*(["'])cid:(?:<)?icon\.png(?:>)?\2/gi,
-      `$1=$2https://www.gstatic.com/images/icons/material/system/2x/help_outline_amber_48dp.png$2`
-    )
+    sanitizedHtml = sanitizedHtml
+      .replace(
+        /(src|href|poster|background)\s*=\s*(["']?)cid:(?:<)?icon\.(?:png|jpe?g|gif|webp)(?:@[^"'\s>]+)?(?:>)?\2/gi,
+        `$1="${GMAIL_BOUNCE_ICON_DATA_URI}"`
+      )
+      .replace(
+        /<img\b([^>]*?)(src\s*=\s*(["']?)cid:[^"'\s>]+?\3)([^>]*?)>/gi,
+        (match, before, _srcAttr, _quote, after) => {
+          const combined = `${before} ${after}`
+          if (/alt\s*=\s*["'](?:Error(?:\s+Icon)?|Delivery\s+Failure)["']/i.test(combined) || /icon\.png/i.test(match)) {
+            return `<img ${before}src="${GMAIL_BOUNCE_ICON_DATA_URI}"${after}>`
+          }
+          return match
+        }
+      )
+      .replace(
+        /https:\/\/www\.gstatic\.com\/images\/icons\/material\/system\/2x\/help_outline_amber_48dp\.png/gi,
+        GMAIL_BOUNCE_ICON_DATA_URI
+      )
 
-    const metaTags = '<meta charset="utf-8"/><meta name="referrer" content="no-referrer"/>'
+    const metaTags = '<meta charset="utf-8"/><meta name="referrer" content="no-referrer"/><meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests"/>'
     const baseTag = '<base target="_blank">'
     const responsiveStyle = `
       <style>
@@ -148,8 +164,22 @@ function EmailHtmlViewerComponent({
       if (doc) {
         const images = doc.querySelectorAll("img")
         images.forEach((img) => {
+          img.addEventListener(
+            "error",
+            () => {
+              if (
+                img.alt?.toLowerCase().includes("error") ||
+                img.src?.includes("icon.png") ||
+                img.getAttribute("src")?.includes("icon.png") ||
+                img.src?.includes("help_outline_amber")
+              ) {
+                img.src = GMAIL_BOUNCE_ICON_DATA_URI
+              }
+              updateHeight()
+            },
+            { once: true }
+          )
           img.addEventListener("load", updateHeight, { once: true })
-          img.addEventListener("error", updateHeight, { once: true })
         })
       }
     } catch {

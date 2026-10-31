@@ -4,6 +4,7 @@ import {
   encodeGmailBase64,
   buildRawRfc2822Email,
   extractEmailBodies,
+  GMAIL_BOUNCE_ICON_DATA_URI,
   fetchAllGmailFolders,
   sendGmailDraft,
   sendGmailMessage,
@@ -138,9 +139,7 @@ describe("gmailApiService decoding and HTML extraction", () => {
     }
 
     const { htmlBody } = extractEmailBodies(payload)
-    expect(htmlBody).toContain(
-      'src="https://www.gstatic.com/images/icons/material/system/2x/help_outline_amber_48dp.png"'
-    )
+    expect(htmlBody).toContain(`src="${GMAIL_BOUNCE_ICON_DATA_URI}"`)
   })
 
   describe("fetchAllGmailFolders one-click synchronization", () => {

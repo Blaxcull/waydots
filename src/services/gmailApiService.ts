@@ -136,6 +136,16 @@ export function decodeGmailBase64(base64Str: string): string {
   }
 }
 
+export const GMAIL_BOUNCE_ICON_DATA_URI = `data:image/svg+xml;utf8,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="56" viewBox="0 0 48 56" fill="none">` +
+    `<rect x="2" y="2" width="44" height="52" rx="3" fill="#ea8600"/>` +
+    `<circle cx="24" cy="9" r="2.5" fill="#c47000"/>` +
+    `<rect x="7" y="15" width="34" height="32" rx="2" fill="#ffffff"/>` +
+    `<path d="M2 42L14 54H2V42Z" fill="#c47000"/>` +
+    `<text x="24" y="38" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="bold" fill="#ea8600" text-anchor="middle">?</text>` +
+  `</svg>`
+)}`
+
 export function extractEmailBodies(payload: any): { plainText: string; htmlBody: string } {
   if (!payload) return { plainText: "", htmlBody: "" }
 
@@ -218,10 +228,25 @@ export function extractEmailBodies(payload: any): { plainText: string; htmlBody:
     )
 
     // Fallback for Mailer-Daemon delivery failure bounce icon if not resolved as inline CID
-    htmlBody = htmlBody.replace(
-      /(src|href|poster|background)\s*=\s*(["'])cid:(?:<)?icon\.png(?:>)?\2/gi,
-      `$1=$2https://www.gstatic.com/images/icons/material/system/2x/help_outline_amber_48dp.png$2`
-    )
+    htmlBody = htmlBody
+      .replace(
+        /(src|href|poster|background)\s*=\s*(["']?)cid:(?:<)?icon\.(?:png|jpe?g|gif|webp)(?:@[^"'\s>]+)?(?:>)?\2/gi,
+        `$1="${GMAIL_BOUNCE_ICON_DATA_URI}"`
+      )
+      .replace(
+        /<img\b([^>]*?)(src\s*=\s*(["']?)cid:[^"'\s>]+?\3)([^>]*?)>/gi,
+        (match, before, _srcAttr, _quote, after) => {
+          const combined = `${before} ${after}`
+          if (/alt\s*=\s*["'](?:Error(?:\s+Icon)?|Delivery\s+Failure)["']/i.test(combined) || /icon\.png/i.test(match)) {
+            return `<img ${before}src="${GMAIL_BOUNCE_ICON_DATA_URI}"${after}>`
+          }
+          return match
+        }
+      )
+      .replace(
+        /https:\/\/www\.gstatic\.com\/images\/icons\/material\/system\/2x\/help_outline_amber_48dp\.png/gi,
+        GMAIL_BOUNCE_ICON_DATA_URI
+      )
   }
 
   // If plainText is missing but htmlBody exists, strip tags cleanly for search/snippets/AI
