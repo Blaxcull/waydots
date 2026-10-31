@@ -2005,9 +2005,6 @@ export default function MailView() {
                       >
                         Priority: {selectedEmail.priority.toUpperCase()}
                       </span>
-                      <span className="text-xs font-medium text-neutral-400">
-                        {folderTitle}
-                      </span>
                     </div>
                   </div>
 
