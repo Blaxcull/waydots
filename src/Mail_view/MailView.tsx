@@ -1710,19 +1710,19 @@ export default function MailView() {
       )}
 
       {/* Main Mail Container */}
-      <div className="flex h-full w-full min-h-0 overflow-hidden rounded-[28px] border border-gray-300/80 bg-[#ececeb] shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
+      <div className="flex h-full w-full min-h-0 overflow-hidden rounded-[28px] border border-gray-300/80 bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)]">
         {/* VIEW 1: FULL PAGE MAILBOX OVERVIEW (When no email is selected) */}
         {!selectedEmail ? (
-          <div className="flex h-full w-full flex-col overflow-hidden bg-[#ececeb]">
-            {/* Header: All | High (x) | Med (y) | Low (z) | Priority Wise */}
-            <div className="flex items-center justify-between gap-3 border-b border-gray-300/70 px-3 sm:px-6 py-2.5 sm:py-3 bg-[#ececeb] overflow-hidden">
+          <div className="flex h-full w-full flex-col overflow-hidden bg-white">
+            {/* Header: All | High (x) | Med (y) | Low (z) */}
+            <div className="flex items-center justify-between gap-3 border-b border-gray-200/80 px-3 sm:px-6 py-2.5 sm:py-3 bg-white overflow-hidden">
               <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar w-full pb-1 sm:pb-0">
                 {/* Fast Priority Filter Pills: All | High | Med | Low */}
-                <div className="flex items-center rounded-full border border-gray-300/80 bg-[#dededc] p-1 shadow-inner shrink-0">
+                <div className="flex items-center rounded-full border border-gray-300/80 bg-[#f4f4f3] p-1 shadow-inner shrink-0">
                   <button
                     type="button"
                     onClick={() => setPriorityFilter("all")}
-                    className={`rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                    className={`rounded-full px-3.5 py-1 text-xs sm:text-sm font-semibold transition-all ${
                       priorityFilter === "all"
                         ? "bg-white text-neutral-900 shadow-sm"
                         : "text-neutral-600 hover:text-neutral-900"
@@ -1733,7 +1733,7 @@ export default function MailView() {
                   <button
                     type="button"
                     onClick={() => setPriorityFilter("high")}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs sm:text-sm font-semibold transition-all ${
                       priorityFilter === "high"
                         ? "bg-white text-rose-700 shadow-sm"
                         : "text-neutral-600 hover:text-rose-700"
@@ -1745,7 +1745,7 @@ export default function MailView() {
                   <button
                     type="button"
                     onClick={() => setPriorityFilter("medium")}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs sm:text-sm font-semibold transition-all ${
                       priorityFilter === "medium"
                         ? "bg-white text-amber-700 shadow-sm"
                         : "text-neutral-600 hover:text-amber-700"
@@ -1757,7 +1757,7 @@ export default function MailView() {
                   <button
                     type="button"
                     onClick={() => setPriorityFilter("low")}
-                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs font-semibold transition-all ${
+                    className={`flex items-center gap-1.5 rounded-full px-3.5 py-1 text-xs sm:text-sm font-semibold transition-all ${
                       priorityFilter === "low"
                         ? "bg-white text-emerald-700 shadow-sm"
                         : "text-neutral-600 hover:text-emerald-700"
@@ -1816,7 +1816,7 @@ export default function MailView() {
             </div>
 
             {/* SELECTION TOOLBAR (Select options like Mail: Master Checkbox + Dropdown + Bulk Actions) */}
-            <div className="flex items-center justify-between border-b border-gray-300/60 px-6 py-2.5 bg-[#ececeb] text-xs text-neutral-600">
+            <div className="flex items-center justify-between border-b border-gray-200/80 px-6 py-3 bg-white text-xs text-neutral-600">
               <div className="flex items-center gap-3">
                 {/* Master Checkbox with Dropdown Trigger */}
                 <div ref={selectDropdownRef} className="relative flex items-center gap-1.5">
@@ -1851,42 +1851,42 @@ export default function MailView() {
                       <button
                         type="button"
                         onClick={() => handleSelectFilter("all")}
-                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-[#ececeb] rounded-xl transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
                       >
                         All
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectFilter("none")}
-                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-[#ececeb] rounded-xl transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
                       >
                         None
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectFilter("read")}
-                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-[#ececeb] rounded-xl transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
                       >
                         Read
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectFilter("unread")}
-                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-[#ececeb] rounded-xl transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
                       >
                         Unread
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectFilter("starred")}
-                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-[#ececeb] rounded-xl transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
                       >
                         Starred
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSelectFilter("unstarred")}
-                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-[#ececeb] rounded-xl transition-colors"
+                        className="w-full text-left px-3 py-1.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-100 rounded-xl transition-colors"
                       >
                         Unstarred
                       </button>
@@ -1897,7 +1897,7 @@ export default function MailView() {
                 {/* Bulk Action Buttons if emails are selected */}
                 {selectedEmailIds.length > 0 ? (
                   <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-neutral-800 text-xs mr-1">
+                    <span className="font-semibold text-neutral-800 text-sm mr-1.5">
                       {selectedEmailIds.length} selected
                     </span>
                     <button
@@ -1948,22 +1948,22 @@ export default function MailView() {
                     </button>
                   </div>
                 ) : (
-                  <span className="text-[11px] font-medium text-neutral-500">
+                  <span className="text-xs sm:text-sm font-medium text-neutral-500">
                     Select emails to perform bulk actions
                   </span>
                 )}
               </div>
 
               {/* Counts display */}
-              <div className="text-[11px] font-medium text-neutral-500 tabular-nums">
+              <div className="text-xs sm:text-sm font-medium text-neutral-500 tabular-nums">
                 1–{displayedEmails.length} of {folderEmails.length}
               </div>
             </div>
 
             {/* Full-Width Email Rows List */}
-            <div className="flex-1 overflow-y-auto divide-y divide-gray-200/80 bg-[#ececeb]">
+            <div className="flex-1 overflow-y-auto divide-y divide-gray-100 bg-white">
               {!isGoogleAccount && !hasGoogleToken && displayedEmails.length === 0 ? (
-                <div className="flex h-full min-h-[420px] flex-col items-center justify-center p-8 text-center bg-[#ececeb]">
+                <div className="flex h-full min-h-[420px] flex-col items-center justify-center p-8 text-center bg-white">
                   <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-xs border border-gray-200/90 mb-4">
                     <GoogleIcon className="h-8 w-8" />
                   </div>
@@ -2033,30 +2033,30 @@ export default function MailView() {
                       onClick={() => handleViewEmail(email)}
                       className={`group w-full text-left transition-all duration-150 cursor-pointer ${
                         isChecked
-                          ? "bg-[#dededc] border-l-2 border-neutral-700"
+                          ? "bg-neutral-100 border-l-2 border-neutral-800"
                           : isOpened
-                          ? "bg-[#e8e8e6]/50 opacity-75 hover:opacity-100 hover:bg-[#f3f3f2]"
-                          : "bg-[#ececeb] opacity-100 hover:bg-[#f3f3f2]"
+                          ? "bg-white opacity-85 hover:opacity-100 hover:bg-neutral-50/90"
+                          : "bg-white opacity-100 hover:bg-neutral-50"
                       }`}
                     >
                       {/* MOBILE VIEW (< md:): Multi-line clean card with avatar/sender on top, subject in middle, snippet below */}
-                      <div className="flex md:hidden flex-col gap-1.5 px-3.5 py-3 border-b border-gray-200/60">
+                      <div className="flex md:hidden flex-col gap-1.5 px-4 py-3.5 border-b border-gray-100 bg-white">
                         <div className="flex items-center justify-between gap-2 min-w-0">
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2.5 min-w-0">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleSelectEmail(email.id)
                               }}
-                              className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all shrink-0 ${
+                              className={`flex h-5 w-5 items-center justify-center rounded border transition-all shrink-0 ${
                                 isChecked
                                   ? "border-neutral-900 bg-neutral-900 text-white"
-                                  : "border-gray-300 bg-white/90 hover:border-gray-500"
+                                  : "border-gray-300 bg-white hover:border-gray-500"
                               }`}
                               title={isChecked ? "Deselect" : "Select"}
                             >
-                              {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                              {isChecked && <Check className="h-3.5 w-3.5 stroke-[3]" />}
                             </button>
 
                             <button
@@ -2069,7 +2069,7 @@ export default function MailView() {
                               title={email.starred ? "Unstar" : "Star"}
                             >
                               <Star
-                                className={`h-4 w-4 ${
+                                className={`h-4.5 w-4.5 ${
                                   email.starred ? "text-amber-400 fill-amber-400" : ""
                                 }`}
                               />
@@ -2088,53 +2088,53 @@ export default function MailView() {
                               title={email.unread ? `Unread (${email.priority.toUpperCase()} priority)` : "Read"}
                             />
 
-                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-[10px] text-neutral-700 shrink-0">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-100 border border-neutral-200 font-bold text-xs text-neutral-700 shrink-0">
                               {email.senderName.charAt(0)}
                             </div>
 
                             <span
-                              className={`truncate text-sm ${
+                              className={`truncate text-[15px] sm:text-base ${
                                 email.unread
                                   ? "font-bold text-neutral-900"
-                                  : "font-medium text-neutral-700"
+                                  : "font-semibold text-neutral-700"
                               }`}
                             >
                               {email.senderName}
                             </span>
                           </div>
 
-                          <span className="shrink-0 text-xs font-medium text-neutral-400 tabular-nums">
+                          <span className="shrink-0 text-xs sm:text-sm font-medium text-neutral-400 tabular-nums">
                             {email.timestamp}
                           </span>
                         </div>
 
                         {/* Subject & optional meeting badge */}
-                        <div className="flex items-center gap-2 min-w-0 pl-7">
+                        <div className="flex items-center gap-2 min-w-0 pl-8">
                           <span
-                            className={`truncate text-sm ${
-                              email.unread ? "font-semibold text-neutral-900" : "font-normal text-neutral-800"
+                            className={`truncate text-[15px] sm:text-base ${
+                              email.unread ? "font-semibold text-neutral-900" : "font-medium text-neutral-800"
                             }`}
                           >
                             {email.subject}
                           </span>
                           {email.meetingInfo?.hasMeeting && (
-                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white/90 px-2 py-0.5 text-[10px] font-medium text-neutral-700 shadow-2xs">
-                              <Calendar className="h-2.5 w-2.5 text-neutral-600" />
+                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-700 shadow-2xs">
+                              <Calendar className="h-3 w-3 text-neutral-600" />
                               <span>{email.meetingInfo.duration || "Meeting"}</span>
                             </span>
                           )}
                         </div>
 
                         {/* Body preview */}
-                        <div className="min-w-0 pl-7">
-                          <p className={`truncate text-xs ${email.unread ? "text-neutral-600" : "text-neutral-400"}`}>
+                        <div className="min-w-0 pl-8">
+                          <p className={`truncate text-sm ${email.unread ? "text-neutral-700" : "text-neutral-500"}`}>
                             {email.body.replace(/\n+/g, " ")}
                           </p>
                         </div>
                       </div>
 
-                      {/* DESKTOP VIEW (md:): Original single-line layout preserved exactly */}
-                      <div className="hidden md:flex w-full items-center gap-3.5 px-6 py-4">
+                      {/* DESKTOP VIEW (md:): Single-line layout with white background and increased text size */}
+                      <div className="hidden md:flex w-full items-center gap-4 px-6 py-4 bg-white">
                         {/* Selection Checkbox (like Gmail) */}
                         <button
                           type="button"
@@ -2142,14 +2142,14 @@ export default function MailView() {
                             e.stopPropagation()
                             toggleSelectEmail(email.id)
                           }}
-                          className={`flex h-4.5 w-4.5 items-center justify-center rounded border transition-all shrink-0 ${
+                          className={`flex h-5 w-5 items-center justify-center rounded border transition-all shrink-0 ${
                             isChecked
                               ? "border-neutral-900 bg-neutral-900 text-white"
-                              : "border-gray-300 bg-white/90 hover:border-gray-500"
+                              : "border-gray-300 bg-white hover:border-gray-500"
                           }`}
                           title={isChecked ? "Deselect" : "Select"}
                         >
-                          {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
+                          {isChecked && <Check className="h-3.5 w-3.5 stroke-[3]" />}
                         </button>
 
                         {/* Star & Priority-Colored Read/Unread Dot */}
@@ -2164,7 +2164,7 @@ export default function MailView() {
                             title={email.starred ? "Unstar" : "Star"}
                           >
                             <Star
-                              className={`h-4 w-4 ${
+                              className={`h-4.5 w-4.5 ${
                                 email.starred ? "text-amber-400 fill-amber-400" : ""
                               }`}
                             />
@@ -2184,15 +2184,15 @@ export default function MailView() {
                         </div>
 
                         {/* Sender */}
-                        <div className="flex items-center gap-3 w-44 shrink-0 min-w-0">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#dedddc] border border-white/60 font-bold text-xs text-neutral-700 shrink-0 shadow-xs">
+                        <div className="flex items-center gap-3 w-48 shrink-0 min-w-0">
+                          <div className="flex h-8.5 w-8.5 items-center justify-center rounded-full bg-neutral-100 border border-neutral-200 font-bold text-xs text-neutral-700 shrink-0 shadow-2xs">
                             {email.senderName.charAt(0)}
                           </div>
                           <span
-                            className={`truncate text-sm ${
+                            className={`truncate text-[15px] sm:text-base ${
                               email.unread
                                 ? "font-bold text-neutral-900"
-                                : "font-normal text-neutral-600"
+                                : "font-medium text-neutral-700"
                             }`}
                           >
                             {email.senderName}
@@ -2202,10 +2202,10 @@ export default function MailView() {
                         {/* Subject, Snippet & Meeting Badges */}
                         <div className="flex items-center gap-2.5 flex-1 min-w-0">
                           <span
-                            className={`shrink-0 text-sm ${
+                            className={`shrink-0 text-[15px] sm:text-base ${
                               email.unread
                                 ? "font-bold text-neutral-900"
-                                : "font-normal text-neutral-600"
+                                : "font-medium text-neutral-700"
                             }`}
                           >
                             {email.subject}
@@ -2213,7 +2213,7 @@ export default function MailView() {
 
                           {/* Meeting Timing & Duration Badge */}
                           {email.meetingInfo?.hasMeeting && (
-                            <span className="shrink-0 inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white/90 px-2 py-0.5 text-[11px] font-medium text-neutral-700 shadow-2xs">
+                            <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-gray-300 bg-neutral-50 px-2.5 py-0.5 text-xs font-medium text-neutral-700 shadow-2xs">
                               <Calendar className="h-3 w-3 text-neutral-600" />
                               <span>
                                 {email.meetingInfo.duration
@@ -2226,9 +2226,9 @@ export default function MailView() {
                             </span>
                           )}
 
-                          <span className="text-neutral-400">—</span>
+                          <span className="text-neutral-300 mx-0.5">—</span>
                           <span
-                            className={`truncate text-xs ${
+                            className={`truncate text-sm ${
                               email.unread ? "text-neutral-600" : "text-neutral-400"
                             }`}
                           >
@@ -2237,9 +2237,9 @@ export default function MailView() {
                         </div>
 
                         {/* Right: Timestamp & Hover Delete Button (hidden for sent emails) */}
-                        <div className="relative flex items-center justify-end w-24 shrink-0">
+                        <div className="relative flex items-center justify-end w-28 shrink-0">
                           <span
-                            className={`text-xs font-medium text-neutral-400 ${
+                            className={`text-sm font-medium text-neutral-400 ${
                               !email.isSent && activeFolder !== "sent" && activeFolder !== "trash" ? "group-hover:opacity-0" : ""
                             } transition-opacity tabular-nums`}
                           >
@@ -2448,9 +2448,9 @@ export default function MailView() {
           </div>
 
           {/* RIGHT COLUMN: Mailbox Overview List */}
-            <div className="hidden md:flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-l border-gray-300/70 bg-[#ececeb]">
+            <div className="hidden md:flex w-full md:w-[380px] lg:w-[420px] shrink-0 flex-col border-l border-gray-200/80 bg-white">
               {/* Header with expand to full page button */}
-              <div className="flex items-center justify-between border-b border-gray-300/70 px-4 py-3 bg-[#e7e7e6]">
+              <div className="flex items-center justify-between border-b border-gray-200/80 px-4 py-3 bg-white">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">
                     {folderTitle} ({displayedEmails.length})
@@ -2460,7 +2460,7 @@ export default function MailView() {
                   type="button"
                   onClick={() => selectEmail(null)}
                   title="Expand to Full Page Overview"
-                  className="flex items-center gap-1 rounded-full border border-gray-300/80 bg-white/70 px-2.5 py-1 text-xs font-semibold text-neutral-600 hover:bg-white hover:text-neutral-800 transition-all active:scale-95 shadow-xs"
+                  className="flex items-center gap-1 rounded-full border border-gray-300/80 bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 text-xs font-semibold text-neutral-700 hover:text-neutral-900 transition-all active:scale-95 shadow-xs"
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
                   <span>Full View</span>
@@ -2468,7 +2468,7 @@ export default function MailView() {
               </div>
 
               {searchQuery && (
-                <div className="flex items-center justify-between border-b border-gray-200 bg-neutral-200/50 px-4 py-2 text-xs text-neutral-600">
+                <div className="flex items-center justify-between border-b border-gray-200 bg-neutral-100 px-4 py-2 text-xs text-neutral-600">
                   <span className="truncate">Filter: &ldquo;{searchQuery}&rdquo;</span>
                   <button
                     type="button"
@@ -2480,7 +2480,7 @@ export default function MailView() {
                 </div>
               )}
 
-              <div className="flex-1 overflow-y-auto divide-y divide-gray-200/80">
+              <div className="flex-1 overflow-y-auto divide-y divide-gray-100 bg-white">
                 {displayedEmails.map((email) => {
                   const isSelected = selectedEmail?.id === email.id
                   const isOpened = !email.unread
@@ -2491,10 +2491,10 @@ export default function MailView() {
                       onClick={() => handleViewEmail(email)}
                       className={`group flex w-full flex-col gap-1.5 p-4 text-left transition-all cursor-pointer ${
                         isSelected
-                          ? "bg-[#dddddd] shadow-xs"
+                          ? "bg-neutral-100 shadow-xs"
                           : isOpened
-                          ? "bg-[#e8e8e6]/40 opacity-75 hover:opacity-100 hover:bg-[#f3f3f2]"
-                          : "hover:bg-[#f3f3f2] opacity-100"
+                          ? "bg-white opacity-85 hover:opacity-100 hover:bg-neutral-50/90"
+                          : "bg-white hover:bg-neutral-50 opacity-100"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -2512,10 +2512,10 @@ export default function MailView() {
                             />
                           )}
                           <span
-                            className={`truncate text-sm ${
+                            className={`truncate text-[15px] ${
                               email.unread
                                 ? "font-bold text-neutral-900"
-                                : "font-normal text-neutral-600"
+                                : "font-medium text-neutral-700"
                             }`}
                           >
                             {email.senderName}
@@ -2541,7 +2541,7 @@ export default function MailView() {
                           </button>
                           <div className="relative flex items-center justify-end">
                             <span
-                              className={`text-xs text-neutral-400 ${
+                              className={`text-xs sm:text-sm text-neutral-400 ${
                                 !email.isSent && activeFolder !== "sent" && activeFolder !== "trash" ? "group-hover:opacity-0" : ""
                               } transition-opacity tabular-nums`}
                             >
@@ -2566,7 +2566,7 @@ export default function MailView() {
 
                       <div className="flex items-center gap-2">
                         <span
-                          className={`truncate text-xs ${
+                          className={`truncate text-sm ${
                             email.unread ? "font-semibold text-neutral-900" : "text-neutral-600 font-normal"
                           }`}
                         >
