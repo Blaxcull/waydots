@@ -18,7 +18,7 @@ const taskViews: TaskViewType[] = ["inbox", "today", "upcoming", "completed"]
 const mailTabs: { id: MailFolder; label: string }[] = [
   { id: "inbox", label: "Inbox" },
   { id: "starred", label: "Starred" },
-  { id: "draft", label: "Draft" },
+  { id: "trash", label: "Trash" },
   { id: "sent", label: "Sent" },
 ]
 
@@ -73,7 +73,7 @@ export function ViewSwitcher({ currentView, onViewChange }: ViewSwitcherProps) {
     }
   }
 
-  // When on /mail, render the 4 mail sections: Inbox, Starred, Draft, Sent
+  // When on /mail, render the 4 mail sections: Inbox, Starred, Trash, Sent
   if (isMailView) {
     return (
       <div className="pointer-events-none fixed inset-x-0 bottom-5 sm:bottom-auto sm:top-4 z-50 flex justify-center px-2 sm:px-4">

@@ -1,7 +1,7 @@
 import { create } from "zustand"
 
 export type EmailPriority = "high" | "medium" | "low"
-export type MailFolder = "inbox" | "starred" | "draft" | "sent"
+export type MailFolder = "inbox" | "starred" | "trash" | "sent" | "draft"
 export type PriorityFilter = "all" | "high" | "medium" | "low"
 
 export interface MeetingInfo {
@@ -46,6 +46,7 @@ export interface Email {
   starred?: boolean
   isDraft?: boolean
   isSent?: boolean
+  isTrash?: boolean
   draftId?: string
   threadId?: string
   aiDraft?: EmailDraft
@@ -273,6 +274,20 @@ const INITIAL_EMAILS: Email[] = [
     starred: false,
     isSent: true,
     priority: "low",
+  },
+  {
+    id: "email-trash-1",
+    subject: "Newsletter Subscription Notice",
+    senderName: "Daily Digest",
+    senderEmail: "news@dailydigest.com",
+    recipientEmail: "you@waydots.com",
+    body: "Your weekly digest is here. This conversation was moved to Trash.",
+    timestamp: "Oct 19",
+    unread: false,
+    starred: false,
+    isTrash: true,
+    priority: "low",
+    priorityReason: "In Trash",
   },
 ]
 
@@ -556,18 +571,33 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
     })),
 
   deleteEmail: (id) =>
-    set((state) => ({
-      emails: state.emails.filter((e) => e.id !== id),
-      selectedEmailId: state.selectedEmailId === id ? null : state.selectedEmailId,
-    })),
+    set((state) => {
+      const target = state.emails.find((e) => e.id === id)
+      if (target?.isTrash) {
+        // Already in Trash: permanently delete
+        return {
+          emails: state.emails.filter((e) => e.id !== id),
+          selectedEmailId: state.selectedEmailId === id ? null : state.selectedEmailId,
+        }
+      }
+      // Move to Trash
+      return {
+        emails: state.emails.map((e) => (e.id === id ? { ...e, isTrash: true } : e)),
+        selectedEmailId: state.selectedEmailId === id ? null : state.selectedEmailId,
+      }
+    }),
 
   restoreDeletedEmails: (restored) =>
-    set((state) => ({
-      emails: [
-        ...restored.filter((r) => !state.emails.some((e) => e.id === r.id)),
-        ...state.emails,
-      ],
-    })),
+    set((state) => {
+      const restoredIds = new Set(restored.map((r) => r.id))
+      const updated = state.emails.map((e) => (restoredIds.has(e.id) ? { ...e, isTrash: false } : e))
+      const missing = restored
+        .filter((r) => !state.emails.some((e) => e.id === r.id))
+        .map((r) => ({ ...r, isTrash: false }))
+      return {
+        emails: [...missing, ...updated],
+      }
+    }),
 
   markBatchAsRead: (ids) =>
     set((state) => ({
@@ -581,7 +611,11 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
 
   deleteBatchEmails: (ids) =>
     set((state) => ({
-      emails: state.emails.filter((e) => !ids.includes(e.id)),
+      emails: state.emails.flatMap((e) => {
+        if (!ids.includes(e.id)) return [e]
+        if (e.isTrash) return []
+        return [{ ...e, isTrash: true }]
+      }),
       selectedEmailId: ids.includes(state.selectedEmailId || "") ? null : state.selectedEmailId,
     })),
 
@@ -627,7 +661,7 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
       return {
         emails: [newEmail, ...state.emails],
         selectedEmailId: newEmail.id,
-        activeFolder: isDraft ? "draft" : "sent",
+        activeFolder: isDraft ? state.activeFolder : "sent",
       }
     }),
 }))

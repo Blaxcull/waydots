@@ -189,6 +189,12 @@ describe("gmailApiService decoding and HTML extraction", () => {
             json: async () => ({ messages: [] }),
           })
         }
+        if (url.includes("q=in%3Atrash") || url.includes("q=in:trash")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ messages: [{ id: "msg-trash", threadId: "t-4" }] }),
+          })
+        }
         if (url.includes("/users/me/drafts")) {
           return Promise.resolve({
             ok: true,
@@ -253,6 +259,23 @@ describe("gmailApiService decoding and HTML extraction", () => {
             }),
           })
         }
+        if (url.includes("/messages/msg-trash")) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              id: "msg-trash",
+              labelIds: ["TRASH"],
+              payload: {
+                headers: [
+                  { name: "Subject", value: "Deleted Promotion" },
+                  { name: "From", value: "promo@store.com" },
+                  { name: "Date", value: new Date().toISOString() },
+                ],
+                body: { data: "UGxhaW4=" },
+              },
+            }),
+          })
+        }
 
         return Promise.resolve({ ok: false, status: 404, text: async () => "Not found" })
       })
@@ -261,12 +284,13 @@ describe("gmailApiService decoding and HTML extraction", () => {
 
       const results = await fetchAllGmailFolders("mock-token")
 
-      expect(results.length).toBe(3)
+      expect(results.length).toBe(4)
 
       const inboxMsg = results.find((m) => m.id === "msg-inbox")
       expect(inboxMsg).toBeDefined()
       expect(inboxMsg?.isDraft).toBeFalsy()
       expect(inboxMsg?.isSent).toBeFalsy()
+      expect(inboxMsg?.isTrash).toBeFalsy()
       expect(inboxMsg?.starred).toBe(true)
       expect(inboxMsg?.unread).toBe(true)
 
@@ -285,6 +309,11 @@ describe("gmailApiService decoding and HTML extraction", () => {
       expect(draftMsg?.recipientEmail).toBe("partner@example.com")
       expect(draftMsg?.draftId).toBe("draft-xyz")
       expect(draftMsg?.threadId).toBe("t-3")
+
+      const trashMsg = results.find((m) => m.id === "msg-trash")
+      expect(trashMsg).toBeDefined()
+      expect(trashMsg?.isTrash).toBe(true)
+      expect(trashMsg?.subject).toBe("Deleted Promotion")
     })
   })
 

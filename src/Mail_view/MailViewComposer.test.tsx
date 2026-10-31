@@ -300,4 +300,29 @@ describe("MailView Composer & Header Layout", () => {
       expect(textarea.value).toContain("10:00 AM")
     })
   })
+
+  it("filters and displays trashed emails when activeFolder is trash", async () => {
+    const store = useEmailStore.getState()
+    const trashEmail: any = {
+      id: "email-test-trash",
+      subject: "Trashed Newsletter Subject",
+      senderName: "Old Newsletter",
+      senderEmail: "newsletter@example.com",
+      recipientEmail: "you@waydots.com",
+      body: "This is a trashed email content.",
+      timestamp: "Oct 20",
+      unread: false,
+      starred: false,
+      isTrash: true,
+      priority: "low",
+    }
+    store.setEmails([trashEmail, ...store.emails])
+    store.setActiveFolder("trash")
+    store.selectEmail(trashEmail.id)
+
+    render(<MailView />)
+
+    expect(screen.getAllByText("Trashed Newsletter Subject").length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText("Back to Trash Overview")).toBeInTheDocument()
+  })
 })

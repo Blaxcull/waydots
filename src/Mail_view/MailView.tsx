@@ -696,10 +696,15 @@ export default function MailView() {
   // Filter emails by folder and search query (memoized to keep typing fast & lag-free)
   const folderEmails = useMemo(() => {
     return emails.filter((email) => {
-      if (activeFolder === "starred" && !email.starred) return false
-      if (activeFolder === "draft" && !email.isDraft) return false
-      if (activeFolder === "sent" && !email.isSent) return false
-      if (activeFolder === "inbox" && (email.isDraft || email.isSent)) return false
+      if (activeFolder === "trash") {
+        if (!email.isTrash) return false
+      } else {
+        if (email.isTrash) return false
+        if (activeFolder === "starred" && !email.starred) return false
+        if (activeFolder === "draft" && !email.isDraft) return false
+        if (activeFolder === "sent" && !email.isSent) return false
+        if (activeFolder === "inbox" && (email.isDraft || email.isSent)) return false
+      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase()
@@ -1253,7 +1258,7 @@ export default function MailView() {
         const currentEmails = useEmailStore.getState().emails
         const liveIds = new Set(liveEmails.map((e) => e.id))
         const localDraftsAndSent = currentEmails.filter(
-          (e) => !liveIds.has(e.id) && (e.isDraft || e.isSent) && e.id.startsWith("email-")
+          (e) => !liveIds.has(e.id) && (e.isDraft || e.isSent || e.isTrash) && e.id.startsWith("email-")
         )
         const allSynced = [...liveEmails, ...localDraftsAndSent]
         setEmails(allSynced)
@@ -1267,12 +1272,12 @@ export default function MailView() {
         }
 
         if (!isSilent) {
-          const inboxCount = allSynced.filter((e) => !e.isDraft && !e.isSent).length
-          const starredCount = allSynced.filter((e) => e.starred).length
-          const draftCount = allSynced.filter((e) => e.isDraft).length
-          const sentCount = allSynced.filter((e) => e.isSent).length
+          const inboxCount = allSynced.filter((e) => !e.isDraft && !e.isSent && !e.isTrash).length
+          const starredCount = allSynced.filter((e) => e.starred && !e.isTrash).length
+          const trashCount = allSynced.filter((e) => e.isTrash).length
+          const sentCount = allSynced.filter((e) => e.isSent && !e.isTrash).length
           triggerToast(
-            `All mail synced: ${inboxCount} inbox, ${starredCount} starred, ${draftCount} drafts, ${sentCount} sent`
+            `All mail synced: ${inboxCount} inbox, ${starredCount} starred, ${trashCount} trash, ${sentCount} sent`
           )
         }
       } else {
@@ -1476,9 +1481,11 @@ export default function MailView() {
       ? "Inbox"
       : activeFolder === "starred"
       ? "Starred"
-      : activeFolder === "draft"
-      ? "Drafts"
-      : "Sent"
+      : activeFolder === "trash"
+      ? "Trash"
+      : activeFolder === "sent"
+      ? "Sent"
+      : "Drafts"
 
   return (
     <div className="relative flex h-screen w-full flex-col overflow-hidden bg-[#f3f3f2] pt-[84px] sm:pt-[116px] px-2 sm:px-4 pb-24 sm:pb-4">
@@ -1730,7 +1737,7 @@ export default function MailView() {
                   type="button"
                   onClick={() => syncGmailAutomatically(false)}
                   disabled={isGmailSyncing}
-                  title="One-click sync for Inbox, Starred, Drafts & Sent"
+                  title="One-click sync for Inbox, Starred, Trash & Sent"
                   className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 ${
                     isGmailSyncing
                       ? "border-blue-400 bg-blue-50 text-blue-700 shadow-xs"
@@ -1914,7 +1921,11 @@ export default function MailView() {
             <div className="flex-1 overflow-y-auto divide-y divide-gray-200/80 bg-[#ececeb]">
               {displayedEmails.length === 0 ? (
                 <div className="flex h-64 flex-col items-center justify-center p-6 text-center">
-                  <Inbox className="h-10 w-10 text-neutral-400" />
+                  {activeFolder === "trash" ? (
+                    <Trash2 className="h-10 w-10 text-neutral-400" />
+                  ) : (
+                    <Inbox className="h-10 w-10 text-neutral-400" />
+                  )}
                   <p className="mt-3 text-sm font-medium text-neutral-500">
                     No emails matching current criteria in {folderTitle}
                   </p>

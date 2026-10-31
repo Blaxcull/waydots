@@ -100,6 +100,13 @@ export function analyzeEmailWithKeywords(email: Email): {
   meetingInfo?: MeetingInfo
   priorityReason: string
 } {
+  if (email.isTrash) {
+    return {
+      priority: "low",
+      priorityReason: "In Trash / Bin",
+    }
+  }
+
   const text = `${email.subject}\n${email.body}`.toLowerCase()
 
   // Duration detection (only applied if actual meeting)

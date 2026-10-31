@@ -825,6 +825,7 @@ interface MessageItemMeta {
   isStarred?: boolean
   isSent?: boolean
   isDraft?: boolean
+  isTrash?: boolean
 }
 
 /**
@@ -886,7 +887,7 @@ export async function fetchAllGmailFolders(
     localStorage.setItem("user_email", profileData.emailAddress)
   }
 
-  // 2. Concurrently query Inbox, Starred, Sent, and Drafts
+  // 2. Concurrently query Inbox, Starred, Sent, Drafts, and Trash
   interface GmailListResult {
     messages?: Array<{ id: string; threadId?: string }>
     resultSizeEstimate?: number
@@ -900,7 +901,7 @@ export async function fetchAllGmailFolders(
     resultSizeEstimate?: number
   }
 
-  const [inboxRes, starredRes, sentRes, draftMsgRes, draftsListRes] = await Promise.allSettled([
+  const [inboxRes, starredRes, sentRes, draftMsgRes, draftsListRes, trashRes] = await Promise.allSettled([
     fetchGmailJson<GmailListResult>(
       "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=in:inbox",
       accessToken
@@ -921,10 +922,14 @@ export async function fetchAllGmailFolders(
       "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=25",
       accessToken
     ),
+    fetchGmailJson<GmailListResult>(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&includeSpamTrash=true&q=in:trash",
+      accessToken
+    ),
   ])
 
   // Check if any folder query failed due to invalid token or insufficient scopes
-  const authForbidden = [inboxRes, starredRes, sentRes, draftMsgRes, draftsListRes].some(
+  const authForbidden = [inboxRes, starredRes, sentRes, draftMsgRes, draftsListRes, trashRes].some(
     (r) => r.status === "fulfilled" && (r.value.status === 401 || r.value.status === 403)
   )
   if (authForbidden) {
@@ -940,7 +945,7 @@ export async function fetchAllGmailFolders(
   const recordItem = (
     id: string,
     threadId: string | undefined,
-    flag: "isInbox" | "isStarred" | "isSent" | "isDraft",
+    flag: "isInbox" | "isStarred" | "isSent" | "isDraft" | "isTrash",
     draftId?: string
   ) => {
     if (!id) return
@@ -968,6 +973,9 @@ export async function fetchAllGmailFolders(
       const msgId = d.message?.id || d.id
       recordItem(msgId, d.message?.threadId, "isDraft", d.id)
     }
+  }
+  if (trashRes.status === "fulfilled" && trashRes.value?.data?.messages) {
+    for (const m of trashRes.value.data.messages) recordItem(m.id, m.threadId, "isTrash")
   }
 
   const itemsToFetch = Array.from(itemMap.values())
@@ -1011,10 +1019,11 @@ export async function fetchAllGmailFolders(
         if (!msg) return null
 
         const labelIds: string[] = msg.labelIds || []
-        const isDraft = Boolean(labelIds.includes("DRAFT") || meta.isDraft)
-        const isSent = Boolean((labelIds.includes("SENT") || meta.isSent) && !isDraft)
-        const starred = Boolean(labelIds.includes("STARRED") || meta.isStarred)
-        const unread = Boolean(labelIds.includes("UNREAD") && !isDraft && !isSent)
+        const isTrash = Boolean(labelIds.includes("TRASH") || meta.isTrash)
+        const isDraft = Boolean((labelIds.includes("DRAFT") || meta.isDraft) && !isTrash)
+        const isSent = Boolean((labelIds.includes("SENT") || meta.isSent) && !isDraft && !isTrash)
+        const starred = Boolean((labelIds.includes("STARRED") || meta.isStarred) && !isTrash)
+        const unread = Boolean(labelIds.includes("UNREAD") && !isDraft && !isSent && !isTrash)
 
         const headers: Array<{ name: string; value: string }> = msg.payload?.headers || []
         const getHeader = (name: string) =>
@@ -1085,7 +1094,9 @@ export async function fetchAllGmailFolders(
           starred,
           isDraft: isDraft || undefined,
           isSent: isSent || undefined,
-          priority: "medium",
+          isTrash: isTrash || undefined,
+          priority: isTrash ? "low" : "medium",
+          priorityReason: isTrash ? "In Trash / Bin" : undefined,
           draftId: meta.draftId,
           threadId: msg.threadId || meta.threadId,
         }
