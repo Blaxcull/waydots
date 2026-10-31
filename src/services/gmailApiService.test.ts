@@ -82,3 +82,4 @@ describe("gmailApiService decoding and HTML extraction", () => {
     expect(htmlBody).toBe("<p>Nested <strong>HTML</strong></p>")
   })
 })
+
