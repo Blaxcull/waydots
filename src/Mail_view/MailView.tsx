@@ -42,21 +42,6 @@ import {
 } from "@/services/gmailApiService"
 import EmailHtmlViewer from "./EmailHtmlViewer"
 
-const FIVE_MINUTES_MS = 5 * 60 * 1000
-const LAST_GMAIL_SYNC_KEY = "waydots_last_gmail_sync_time"
-
-function recordLastSyncTime(): void {
-  if (typeof window !== "undefined") {
-    localStorage.setItem(LAST_GMAIL_SYNC_KEY, String(Date.now()))
-  }
-}
-
-function getLastSyncTime(): number {
-  if (typeof window === "undefined") return 0
-  const val = localStorage.getItem(LAST_GMAIL_SYNC_KEY)
-  return val ? parseInt(val, 10) : 0
-}
-
 function GoogleIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24">
@@ -824,9 +809,10 @@ export default function MailView() {
   }
 
   const handleBatchDelete = () => {
-    if (selectedEmailIds.length === 0) return
-    const deleted = emails.filter((e) => selectedEmailIds.includes(e.id))
-    deleteBatchEmails(selectedEmailIds)
+    if (selectedEmailIds.length === 0 || activeFolder === "sent") return
+    const deleted = emails.filter((e) => selectedEmailIds.includes(e.id) && !e.isSent)
+    if (deleted.length === 0) return
+    deleteBatchEmails(deleted.map((e) => e.id))
     setSelectedEmailIds([])
     showTrashToast(
       deleted,
@@ -1093,7 +1079,6 @@ export default function MailView() {
             window.history.replaceState({}, document.title, window.location.pathname)
           }
         }
-        recordLastSyncTime()
 
         if (!isSilent) {
           const inboxCount = allSynced.filter((e) => !e.isDraft && !e.isSent).length
@@ -1105,7 +1090,6 @@ export default function MailView() {
           )
         }
       } else {
-        recordLastSyncTime()
         if (!isSilent) {
           triggerToast("All mail synced: No emails found in Gmail mailbox.")
         }
@@ -1134,24 +1118,13 @@ export default function MailView() {
     }
   }, [loggedInEmail, setEmails])
 
-  // Periodic background sync: auto-fetch mails every 5 minutes.
-  // Never fetch on view change/navigation if already synced within 5 minutes.
+  // Automatically fetch emails on mount and periodically every 5 minutes in background
   useEffect(() => {
-    const checkAndSync = () => {
-      const lastSyncTime = getLastSyncTime()
-      const now = Date.now()
+    void syncGmailAutomatically(true)
 
-      // Only auto-fetch if 5 minutes have elapsed since the last sync
-      if (now - lastSyncTime >= FIVE_MINUTES_MS) {
-        void syncGmailAutomatically(true)
-      }
-    }
-
-    // Check once on mount only if 5 minutes have actually elapsed
-    checkAndSync()
-
-    // Periodically check every 30 seconds to trigger sync once the 5-minute mark is reached
-    const interval = setInterval(checkAndSync, 30_000)
+    const interval = setInterval(() => {
+      void syncGmailAutomatically(true)
+    }, 5 * 60 * 1000)
 
     return () => clearInterval(interval)
   }, [syncGmailAutomatically])
@@ -1718,15 +1691,17 @@ export default function MailView() {
                       <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
                       <span>Star</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleBatchDelete}
-                      title="Delete Selected"
-                      className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-all shadow-2xs"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-rose-600" />
-                      <span>Delete</span>
-                    </button>
+                    {activeFolder !== "sent" && (
+                      <button
+                        type="button"
+                        onClick={handleBatchDelete}
+                        title="Delete Selected"
+                        className="flex items-center gap-1 rounded-full border border-gray-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-all shadow-2xs"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-rose-600" />
+                        <span>Delete</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setSelectedEmailIds([])}
@@ -1990,23 +1965,29 @@ export default function MailView() {
                           </span>
                         </div>
 
-                        {/* Right: Timestamp & Hover Delete Button */}
+                        {/* Right: Timestamp & Hover Delete Button (hidden for sent emails) */}
                         <div className="relative flex items-center justify-end w-24 shrink-0">
-                          <span className="text-xs font-medium text-neutral-400 group-hover:opacity-0 transition-opacity tabular-nums">
+                          <span
+                            className={`text-xs font-medium text-neutral-400 ${
+                              !email.isSent && activeFolder !== "sent" ? "group-hover:opacity-0" : ""
+                            } transition-opacity tabular-nums`}
+                          >
                             {email.timestamp}
                           </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              deleteEmail(email.id)
-                              showTrashToast([email], "Conversation moved to Trash.")
-                            }}
-                            title="Delete"
-                            className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 active:scale-95"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!email.isSent && activeFolder !== "sent" && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                deleteEmail(email.id)
+                                showTrashToast([email], "Conversation moved to Trash.")
+                              }}
+                              title="Delete"
+                              className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 active:scale-95"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2068,17 +2049,19 @@ export default function MailView() {
                           }`}
                         />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          deleteEmail(selectedEmail.id)
-                          showTrashToast([selectedEmail], "Conversation moved to Trash.")
-                        }}
-                        className="p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 transition-colors cursor-pointer"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
+                      {!selectedEmail.isSent && activeFolder !== "sent" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            deleteEmail(selectedEmail.id)
+                            showTrashToast([selectedEmail], "Conversation moved to Trash.")
+                          }}
+                          className="p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 transition-colors cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -2283,21 +2266,27 @@ export default function MailView() {
                             />
                           </button>
                           <div className="relative flex items-center justify-end">
-                            <span className="text-xs text-neutral-400 group-hover:opacity-0 transition-opacity tabular-nums">
+                            <span
+                              className={`text-xs text-neutral-400 ${
+                                !email.isSent && activeFolder !== "sent" ? "group-hover:opacity-0" : ""
+                              } transition-opacity tabular-nums`}
+                            >
                               {email.timestamp}
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                deleteEmail(email.id)
-                                showTrashToast([email], "Conversation moved to Trash.")
-                              }}
-                              title="Delete"
-                              className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1 text-neutral-400 hover:text-rose-600 hover:bg-black/5 rounded-full active:scale-95"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            {!email.isSent && activeFolder !== "sent" && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  deleteEmail(email.id)
+                                  showTrashToast([email], "Conversation moved to Trash.")
+                                }}
+                                title="Delete"
+                                className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1 text-neutral-400 hover:text-rose-600 hover:bg-black/5 rounded-full active:scale-95"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

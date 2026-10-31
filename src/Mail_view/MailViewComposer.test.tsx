@@ -167,4 +167,16 @@ describe("MailView Composer & Header Layout", () => {
       expect(textarea.value).toBe("")
     })
   })
+
+  it("does not render delete/bin button for sent emails or in the Sent folder", () => {
+    const store = useEmailStore.getState()
+    store.selectEmail(null)
+    store.setActiveFolder("sent")
+
+    render(<MailView />)
+
+    // No delete buttons should be present in the sent view
+    expect(screen.queryByTitle("Delete")).not.toBeInTheDocument()
+    expect(screen.queryByTitle("Delete Selected")).not.toBeInTheDocument()
+  })
 })
