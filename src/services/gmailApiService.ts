@@ -612,6 +612,211 @@ export async function saveGmailDraft(params: {
   }
 }
 
+/**
+ * Moves an email in Gmail to Trash (or permanently deletes a draft if it is an unsent draft).
+ */
+export async function deleteGmailMessage(params: {
+  id: string
+  draftId?: string
+  isDraft?: boolean
+  accessToken?: string
+}): Promise<{ success: boolean; error?: string; status?: number }> {
+  const token = params.accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    return { success: true }
+  }
+
+  // Skip local mock IDs
+  if (params.id.startsWith("email-") || params.id.startsWith("mock-")) {
+    return { success: true }
+  }
+
+  try {
+    // If it is a draft with a Gmail draftId, delete via drafts endpoint
+    if (params.isDraft && params.draftId && !params.draftId.startsWith("email-")) {
+      const draftRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${encodeURIComponent(params.draftId)}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+      if (draftRes.ok || draftRes.status === 204 || draftRes.status === 404) {
+        return { success: true }
+      }
+    }
+
+    // Move message to Trash via users.messages.trash
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(params.id)}/trash`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    )
+
+    if (res.ok || res.status === 204 || res.status === 404) {
+      return { success: true }
+    }
+
+    const errJson = await res.json().catch(() => null)
+    return {
+      success: false,
+      status: res.status,
+      error: errJson?.error?.message || `Failed to move email to Trash (${res.status})`,
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to delete email in Gmail" }
+  }
+}
+
+/**
+ * Restores an email from Trash in Gmail (untrash).
+ */
+export async function untrashGmailMessage(
+  id: string,
+  accessToken?: string
+): Promise<{ success: boolean; error?: string; status?: number }> {
+  const token = accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    return { success: true }
+  }
+
+  if (id.startsWith("email-") || id.startsWith("mock-")) {
+    return { success: true }
+  }
+
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}/untrash`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    )
+
+    if (res.ok || res.status === 204 || res.status === 404) {
+      return { success: true }
+    }
+
+    const errJson = await res.json().catch(() => null)
+    return {
+      success: false,
+      status: res.status,
+      error: errJson?.error?.message || `Failed to untrash email in Gmail (${res.status})`,
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to untrash email in Gmail" }
+  }
+}
+
+/**
+ * Marks a Gmail message as read by removing the UNREAD label in Gmail.
+ * Executed as fast as possible when viewing an email.
+ */
+export async function markGmailMessageAsRead(
+  id: string,
+  accessToken?: string
+): Promise<{ success: boolean; error?: string; status?: number }> {
+  const token = accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    return { success: true }
+  }
+
+  // Skip local mock IDs
+  if (id.startsWith("email-") || id.startsWith("mock-")) {
+    return { success: true }
+  }
+
+  try {
+    const res = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${encodeURIComponent(id)}/modify`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          removeLabelIds: ["UNREAD"],
+        }),
+      }
+    )
+
+    if (res.ok || res.status === 204) {
+      return { success: true }
+    }
+
+    const errJson = await res.json().catch(() => null)
+    return {
+      success: false,
+      status: res.status,
+      error: errJson?.error?.message || `Failed to mark email as read in Gmail (${res.status})`,
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to mark email as read in Gmail" }
+  }
+}
+
+/**
+ * Modifies labels (such as UNREAD) on multiple messages simultaneously in Gmail.
+ */
+export async function batchModifyGmailMessages(params: {
+  ids: string[]
+  addLabelIds?: string[]
+  removeLabelIds?: string[]
+  accessToken?: string
+}): Promise<{ success: boolean; error?: string; status?: number }> {
+  const realIds = params.ids.filter((id) => !id.startsWith("email-") && !id.startsWith("mock-"))
+  if (realIds.length === 0) {
+    return { success: true }
+  }
+
+  const token = params.accessToken || (await getGoogleProviderToken())
+  if (!token) {
+    return { success: true }
+  }
+
+  try {
+    const res = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ids: realIds,
+          ...(params.addLabelIds ? { addLabelIds: params.addLabelIds } : {}),
+          ...(params.removeLabelIds ? { removeLabelIds: params.removeLabelIds } : {}),
+        }),
+      }
+    )
+
+    if (res.ok || res.status === 204) {
+      return { success: true }
+    }
+
+    const errJson = await res.json().catch(() => null)
+    return {
+      success: false,
+      status: res.status,
+      error: errJson?.error?.message || `Failed to batch modify emails in Gmail (${res.status})`,
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || "Failed to batch modify emails in Gmail" }
+  }
+}
+
 interface MessageItemMeta {
   id: string
   threadId?: string

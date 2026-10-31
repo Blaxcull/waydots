@@ -39,6 +39,10 @@ import {
   sendGmailDraft,
   sendGmailMessage,
   saveGmailDraft,
+  deleteGmailMessage,
+  untrashGmailMessage,
+  markGmailMessageAsRead,
+  batchModifyGmailMessages,
 } from "@/services/gmailApiService"
 import EmailHtmlViewer from "./EmailHtmlViewer"
 
@@ -763,16 +767,103 @@ export default function MailView() {
     }
   }
 
+  const updateCacheAfterMarkRead = useCallback(
+    (readIds: string[]) => {
+      if (typeof window === "undefined") return
+      const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+      try {
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            const idSet = new Set(readIds)
+            const updated = parsed.map((e) => (idSet.has(e.id) ? { ...e, unread: false } : e))
+            localStorage.setItem(cacheKey, JSON.stringify(updated))
+          }
+        }
+      } catch {
+        // Ignore cache parse error
+      }
+    },
+    [loggedInEmail]
+  )
+
+  const updateCacheAfterMarkUnread = useCallback(
+    (unreadIds: string[]) => {
+      if (typeof window === "undefined") return
+      const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+      try {
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            const idSet = new Set(unreadIds)
+            const updated = parsed.map((e) => (idSet.has(e.id) ? { ...e, unread: true } : e))
+            localStorage.setItem(cacheKey, JSON.stringify(updated))
+          }
+        }
+      } catch {
+        // Ignore cache parse error
+      }
+    },
+    [loggedInEmail]
+  )
+
+  const signaledReadIdsRef = useRef<Set<string>>(new Set())
+
+  // Dispatches read signal to Gmail as fast as possible when viewing an email
+  const handleViewEmail = useCallback(
+    (email: Email) => {
+      const wasUnread = email.unread
+      selectEmail(email.id)
+
+      if (wasUnread) {
+        signaledReadIdsRef.current.add(email.id)
+        updateCacheAfterMarkRead([email.id])
+        void markGmailMessageAsRead(email.id).catch((err) => {
+          console.warn("Failed to mark email as read on Gmail:", err)
+        })
+      }
+    },
+    [selectEmail, updateCacheAfterMarkRead]
+  )
+
+  // Ensure any selected email (e.g. from search or deep link) also dispatches read signal immediately
+  useEffect(() => {
+    if (!selectedEmailId) return
+    if (signaledReadIdsRef.current.has(selectedEmailId)) return
+    const cur = emails.find((e) => e.id === selectedEmailId)
+    if (cur && cur.unread) {
+      signaledReadIdsRef.current.add(selectedEmailId)
+      updateCacheAfterMarkRead([selectedEmailId])
+      void markGmailMessageAsRead(selectedEmailId).catch((err) => {
+        console.warn("Failed to mark email as read on Gmail:", err)
+      })
+    }
+  }, [selectedEmailId, emails, updateCacheAfterMarkRead])
+
   const handleBatchMarkAsRead = () => {
     if (selectedEmailIds.length === 0) return
-    markBatchAsRead(selectedEmailIds)
-    triggerToast(`${selectedEmailIds.length} marked as read`)
+    const ids = [...selectedEmailIds]
+    markBatchAsRead(ids)
+    updateCacheAfterMarkRead(ids)
+    setSelectedEmailIds([])
+    triggerToast(`${ids.length} marked as read`)
+    void batchModifyGmailMessages({ ids, removeLabelIds: ["UNREAD"] }).catch((err) => {
+      console.warn("Failed to batch mark emails as read on Gmail:", err)
+    })
   }
 
   const handleBatchMarkAsUnread = () => {
     if (selectedEmailIds.length === 0) return
-    markBatchAsUnread(selectedEmailIds)
-    triggerToast(`${selectedEmailIds.length} marked as unread`)
+    const ids = [...selectedEmailIds]
+    markBatchAsUnread(ids)
+    updateCacheAfterMarkUnread(ids)
+    setSelectedEmailIds([])
+    triggerToast(`${ids.length} marked as unread`)
+    void batchModifyGmailMessages({ ids, addLabelIds: ["UNREAD"] }).catch((err) => {
+      console.warn("Failed to batch mark emails as unread on Gmail:", err)
+    })
   }
 
   const handleBatchToggleStar = () => {
@@ -791,14 +882,82 @@ export default function MailView() {
     }, 5000)
   }
 
+  const updateCacheAfterDelete = useCallback(
+    (deletedIds: string[]) => {
+      if (typeof window === "undefined") return
+      const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+      try {
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            const idSet = new Set(deletedIds)
+            const updated = parsed.filter((e) => !idSet.has(e.id))
+            localStorage.setItem(cacheKey, JSON.stringify(updated))
+          }
+        }
+      } catch {
+        // Ignore cache parse error
+      }
+    },
+    [loggedInEmail]
+  )
+
+  const updateCacheAfterRestore = useCallback(
+    (restored: Email[]) => {
+      if (typeof window === "undefined") return
+      const cacheKey = `waydots_gmail_cache_${loggedInEmail || "default"}`
+      try {
+        const cached = localStorage.getItem(cacheKey)
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            const updated = [
+              ...restored.filter((r) => !parsed.some((p) => p.id === r.id)),
+              ...parsed,
+            ]
+            localStorage.setItem(cacheKey, JSON.stringify(updated))
+          }
+        }
+      } catch {
+        // Ignore cache parse error
+      }
+    },
+    [loggedInEmail]
+  )
+
+  const handleDeleteSingleEmail = useCallback(
+    (email: Email) => {
+      if (email.isSent || activeFolder === "sent") return
+      deleteEmail(email.id)
+      updateCacheAfterDelete([email.id])
+      showTrashToast([email], "Conversation moved to Trash.")
+      void deleteGmailMessage({
+        id: email.id,
+        draftId: email.draftId,
+        isDraft: email.isDraft,
+      }).catch((err) => {
+        console.warn("Failed to trash email on Gmail:", err)
+      })
+    },
+    [activeFolder, deleteEmail, updateCacheAfterDelete]
+  )
+
   const handleUndoTrash = () => {
     if (!trashToast || trashToast.emails.length === 0) return
-    restoreDeletedEmails(trashToast.emails)
+    const restored = trashToast.emails
+    restoreDeletedEmails(restored)
+    updateCacheAfterRestore(restored)
     if (trashToastTimerRef.current) {
       clearTimeout(trashToastTimerRef.current)
     }
     setTrashToast(null)
     triggerToast("Action undone")
+    void Promise.allSettled(
+      restored.map((e) => untrashGmailMessage(e.id))
+    ).catch((err) => {
+      console.warn("Failed to untrash emails on Gmail:", err)
+    })
   }
 
   const handleDismissTrashToast = () => {
@@ -813,11 +972,23 @@ export default function MailView() {
     const deleted = emails.filter((e) => selectedEmailIds.includes(e.id) && !e.isSent)
     if (deleted.length === 0) return
     deleteBatchEmails(deleted.map((e) => e.id))
+    updateCacheAfterDelete(deleted.map((e) => e.id))
     setSelectedEmailIds([])
     showTrashToast(
       deleted,
       deleted.length > 1 ? `${deleted.length} conversations moved to Trash.` : "Conversation moved to Trash."
     )
+    void Promise.allSettled(
+      deleted.map((e) =>
+        deleteGmailMessage({
+          id: e.id,
+          draftId: e.draftId,
+          isDraft: e.isDraft,
+        })
+      )
+    ).catch((err) => {
+      console.warn("Failed to batch trash emails on Gmail:", err)
+    })
   }
 
   const triggerToast = (msg: string) => {
@@ -1759,7 +1930,7 @@ export default function MailView() {
                   return (
                     <div
                       key={email.id}
-                      onClick={() => selectEmail(email.id)}
+                      onClick={() => handleViewEmail(email)}
                       className={`group w-full text-left transition-all duration-150 cursor-pointer ${
                         isChecked
                           ? "bg-[#dededc] border-l-2 border-neutral-700"
@@ -1979,8 +2150,7 @@ export default function MailView() {
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation()
-                                deleteEmail(email.id)
-                                showTrashToast([email], "Conversation moved to Trash.")
+                                handleDeleteSingleEmail(email)
                               }}
                               title="Delete"
                               className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 active:scale-95"
@@ -2053,8 +2223,7 @@ export default function MailView() {
                         <button
                           type="button"
                           onClick={() => {
-                            deleteEmail(selectedEmail.id)
-                            showTrashToast([selectedEmail], "Conversation moved to Trash.")
+                            handleDeleteSingleEmail(selectedEmail)
                           }}
                           className="p-1.5 rounded-full text-neutral-400 hover:text-rose-600 hover:bg-black/5 transition-colors cursor-pointer"
                           title="Delete"
@@ -2214,7 +2383,7 @@ export default function MailView() {
                   return (
                     <div
                       key={email.id}
-                      onClick={() => selectEmail(email.id)}
+                      onClick={() => handleViewEmail(email)}
                       className={`group flex w-full flex-col gap-1.5 p-4 text-left transition-all cursor-pointer ${
                         isSelected
                           ? "bg-[#dddddd] shadow-xs"
@@ -2278,8 +2447,7 @@ export default function MailView() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  deleteEmail(email.id)
-                                  showTrashToast([email], "Conversation moved to Trash.")
+                                  handleDeleteSingleEmail(email)
                                 }}
                                 title="Delete"
                                 className="absolute right-0 opacity-0 group-hover:opacity-100 transition-all p-1 text-neutral-400 hover:text-rose-600 hover:bg-black/5 rounded-full active:scale-95"

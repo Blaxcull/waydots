@@ -9,6 +9,10 @@ import {
   sendGmailDraft,
   sendGmailMessage,
   saveGmailDraft,
+  deleteGmailMessage,
+  untrashGmailMessage,
+  markGmailMessageAsRead,
+  batchModifyGmailMessages,
 } from "./gmailApiService"
 
 describe("gmailApiService decoding and HTML extraction", () => {
@@ -415,6 +419,119 @@ describe("gmailApiService decoding and HTML extraction", () => {
       expect(res.code).toBe("GMAIL_INSUFFICIENT_SCOPES")
       expect(res.status).toBe(403)
       expect(res.error).toContain("Google account has not granted permission to send")
+    })
+
+    it("moves a Gmail message to Trash via deleteGmailMessage", async () => {
+      let requestedUrl = ""
+      let requestedMethod = ""
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedMethod = options?.method
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ id: "msg-123", labelIds: ["TRASH"] }),
+        })
+      }) as any
+
+      const res = await deleteGmailMessage({
+        id: "msg-123",
+        accessToken: "test-token-123",
+      })
+
+      expect(res.success).toBe(true)
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/msg-123/trash")
+      expect(requestedMethod).toBe("POST")
+    })
+
+    it("deletes a draft message via drafts endpoint if isDraft and draftId provided", async () => {
+      let requestedUrl = ""
+      let requestedMethod = ""
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedMethod = options?.method
+        return Promise.resolve({
+          ok: true,
+          status: 204,
+        })
+      }) as any
+
+      const res = await deleteGmailMessage({
+        id: "msg-draft-123",
+        draftId: "draft-456",
+        isDraft: true,
+        accessToken: "test-token-123",
+      })
+
+      expect(res.success).toBe(true)
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/drafts/draft-456")
+      expect(requestedMethod).toBe("DELETE")
+    })
+
+    it("untrashes a Gmail message via untrashGmailMessage", async () => {
+      let requestedUrl = ""
+      let requestedMethod = ""
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedMethod = options?.method
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ id: "msg-123", labelIds: ["INBOX"] }),
+        })
+      }) as any
+
+      const res = await untrashGmailMessage("msg-123", "test-token-123")
+
+      expect(res.success).toBe(true)
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/msg-123/untrash")
+      expect(requestedMethod).toBe("POST")
+    })
+
+    it("marks a Gmail message as read via markGmailMessageAsRead by removing UNREAD label", async () => {
+      let requestedUrl = ""
+      let requestedBody: any = null
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedBody = JSON.parse(options?.body || "{}")
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ id: "msg-123", labelIds: ["INBOX"] }),
+        })
+      }) as any
+
+      const res = await markGmailMessageAsRead("msg-123", "test-token-123")
+
+      expect(res.success).toBe(true)
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/msg-123/modify")
+      expect(requestedBody).toEqual({ removeLabelIds: ["UNREAD"] })
+    })
+
+    it("modifies multiple messages via batchModifyGmailMessages", async () => {
+      let requestedUrl = ""
+      let requestedBody: any = null
+      globalThis.fetch = vi.fn().mockImplementation((url: string, options: any) => {
+        requestedUrl = url
+        requestedBody = JSON.parse(options?.body || "{}")
+        return Promise.resolve({
+          ok: true,
+          status: 204,
+        })
+      }) as any
+
+      const res = await batchModifyGmailMessages({
+        ids: ["msg-1", "msg-2"],
+        removeLabelIds: ["UNREAD"],
+        accessToken: "test-token-123",
+      })
+
+      expect(res.success).toBe(true)
+      expect(requestedUrl).toBe("https://gmail.googleapis.com/gmail/v1/users/me/messages/batchModify")
+      expect(requestedBody).toEqual({
+        ids: ["msg-1", "msg-2"],
+        removeLabelIds: ["UNREAD"],
+      })
     })
   })
 })

@@ -14,6 +14,10 @@ vi.mock("@/services/gmailApiService", () => ({
   sendGmailDraft: vi.fn().mockResolvedValue({ success: true }),
   sendGmailMessage: vi.fn().mockResolvedValue({ success: true }),
   saveGmailDraft: vi.fn().mockResolvedValue({ success: true }),
+  deleteGmailMessage: vi.fn().mockResolvedValue({ success: true }),
+  untrashGmailMessage: vi.fn().mockResolvedValue({ success: true }),
+  markGmailMessageAsRead: vi.fn().mockResolvedValue({ success: true }),
+  batchModifyGmailMessages: vi.fn().mockResolvedValue({ success: true }),
 }))
 
 vi.mock("@/services/geminiMailService", () => ({
@@ -178,5 +182,61 @@ describe("MailView Composer & Header Layout", () => {
     // No delete buttons should be present in the sent view
     expect(screen.queryByTitle("Delete")).not.toBeInTheDocument()
     expect(screen.queryByTitle("Delete Selected")).not.toBeInTheDocument()
+  })
+
+  it("calls deleteGmailMessage when deleting an email and untrashGmailMessage on Undo", async () => {
+    const { deleteGmailMessage, untrashGmailMessage } = await import("@/services/gmailApiService")
+    const store = useEmailStore.getState()
+    const inboxEmail = store.emails.find((e) => !e.isSent && !e.isDraft) || store.emails[0]
+    store.selectEmail(inboxEmail.id)
+    store.setActiveFolder("inbox")
+
+    render(<MailView />)
+
+    // Find the delete button
+    const deleteBtns = screen.getAllByRole("button", { name: "Delete" })
+    fireEvent.click(deleteBtns[0])
+
+    // Verify deleteGmailMessage was called with the inbox email's id
+    await waitFor(() => {
+      expect(deleteGmailMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: inboxEmail.id,
+        })
+      )
+    })
+
+    // Verify the Undo button is present in the toast
+    const undoBtn = screen.getByRole("button", { name: "Undo" })
+    fireEvent.click(undoBtn)
+
+    // Verify untrashGmailMessage was called to restore the email on Gmail
+    await waitFor(() => {
+      expect(untrashGmailMessage).toHaveBeenCalledWith(inboxEmail.id)
+    })
+  })
+
+  it("sends read signal to Gmail as fast as possible when viewing an unread email", async () => {
+    const { markGmailMessageAsRead } = await import("@/services/gmailApiService")
+    const store = useEmailStore.getState()
+    const targetEmail = store.emails.find((e) => !e.isSent && !e.isDraft) || store.emails[0]
+
+    // Set email as unread and clear active selection
+    store.selectEmail(null)
+    store.setActiveFolder("inbox")
+    store.setEmails(
+      store.emails.map((e) => (e.id === targetEmail.id ? { ...e, unread: true } : e))
+    )
+
+    render(<MailView />)
+
+    // Click on the email row to view it
+    const emailRows = screen.getAllByText(targetEmail.subject)
+    fireEvent.click(emailRows[0])
+
+    // Verify markGmailMessageAsRead was called immediately with the email id
+    await waitFor(() => {
+      expect(markGmailMessageAsRead).toHaveBeenCalledWith(targetEmail.id)
+    })
   })
 })
