@@ -77,6 +77,13 @@ export async function getGoogleProviderToken(): Promise<string | null> {
       return token
     }
 
+    // Try refreshing session
+    const { data: refreshData } = await supabase.auth.refreshSession().catch(() => ({ data: { session: null } }))
+    if (refreshData?.session?.provider_token) {
+      localStorage.setItem("google_provider_token", refreshData.session.provider_token)
+      return refreshData.session.provider_token
+    }
+
     // 5. Inspect Supabase's stored auth item in localStorage
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i)
@@ -859,9 +866,6 @@ export async function fetchAllGmailFolders(
     console.error("Gmail API Error (" + profileRes.status + "):", detailedMsg)
 
     if (profileRes.status === 401 || detailedMsg.toLowerCase().includes("invalid authentication")) {
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("google_provider_token")
-      }
       const authErr = new Error("Google access token has expired. Please sign in again with Google to refresh access.")
       ;(authErr as any).status = 401
       ;(authErr as any).code = "GMAIL_TOKEN_EXPIRED"
@@ -943,9 +947,6 @@ export async function fetchAllGmailFolders(
     (r) => r.status === "fulfilled" && r.value.status === 401
   )
   if (has401) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("google_provider_token")
-    }
     const authErr = new Error("Google access token has expired. Please sign in again with Google to refresh access.")
     ;(authErr as any).status = 401
     ;(authErr as any).code = "GMAIL_TOKEN_EXPIRED"

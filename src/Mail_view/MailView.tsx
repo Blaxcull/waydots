@@ -15,7 +15,6 @@ import {
   ArrowLeft,
   Maximize2,
   Trash2,
-  ArrowUpDown,
   Clock,
   AlertTriangle,
   Wand2,
@@ -26,8 +25,6 @@ import { useEventsStore } from "@/store/eventsStore"
 import { supabase } from "@/lib/supabase"
 import { Button } from "@/components/ui/button"
 import {
-  classifyAndSortEmailsWithGemini,
-  classifyEmailsWithKeywords,
   sortEmailsByPriorityOrder,
   refineDraftWithAiPrompt,
   generateContextualDraft,
@@ -605,7 +602,6 @@ export default function MailView() {
     setSenderAccount,
     setLoggedInUserEmail,
     setPriorityFilter,
-    setSortByPriority,
     setEmails,
     dismissAiDraft,
     updateEmailDraft,
@@ -643,7 +639,6 @@ export default function MailView() {
   const loggedInEmail = user?.email || session?.user?.email || (typeof window !== "undefined" ? localStorage.getItem("user_email") : null)
 
   // AI & Priority state
-  const [isAiSorting, setIsAiSorting] = useState(false)
   const [aiPromptInstruction, setAiPromptInstruction] = useState("")
   const [isRefiningDraft, setIsRefiningDraft] = useState(false)
   const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
@@ -1037,35 +1032,6 @@ export default function MailView() {
     setTimeout(() => setSentToast(null), 3500)
   }
 
-  // Priority Wise Sort handler: sorts INSTANTLY on 1st single click + background Gemini AI enrichment
-  const handleTogglePrioritySort = () => {
-    const nextSortByPriority = !sortByPriority
-    setSortByPriority(nextSortByPriority)
-
-    if (nextSortByPriority) {
-      // 1. Instantly sort emails synchronously on first click (zero delay)
-      const locallyClassified = classifyEmailsWithKeywords(emails)
-      const locallySorted = sortEmailsByPriorityOrder(locallyClassified)
-      setEmails(locallySorted)
-
-      // 2. Seamlessly refine with Gemini AI in the background without blocking the UI
-      setIsAiSorting(true)
-      classifyAndSortEmailsWithGemini(locallySorted)
-        .then((result) => {
-          setEmails(result.emails)
-          if (result.usedGemini) {
-            triggerToast("Prioritized with Gemini AI (Meeting timing, duration & urgency)")
-          }
-        })
-        .catch(() => {
-          // Keep locally sorted emails
-        })
-        .finally(() => {
-          setIsAiSorting(false)
-        })
-    }
-  }
-
   const handleScopeErrorIfPresent = (result: { code?: string; error?: string }) => {
     if (
       result.code === "GMAIL_INSUFFICIENT_SCOPES" ||
@@ -1313,9 +1279,6 @@ export default function MailView() {
         err?.message?.includes("401") ||
         err?.message?.includes("invalid authentication")
       ) {
-        if (typeof window !== "undefined") {
-          localStorage.removeItem("google_provider_token")
-        }
         if (!isSilent) {
           triggerToast("Google session has expired. Please sign in again with Google to reconnect.")
         }
@@ -1751,21 +1714,6 @@ export default function MailView() {
                     Low ({lowCount})
                   </button>
                 </div>
-
-                {/* Priority Sort Toggle */}
-                <button
-                  type="button"
-                  onClick={handleTogglePrioritySort}
-                  title="Toggle priority ordering (High to Low)"
-                  className={`flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-all active:scale-95 cursor-pointer shrink-0 ${
-                    sortByPriority
-                      ? "border-gray-400 bg-[#dddddd] text-neutral-900 shadow-xs"
-                      : "border-gray-300/80 bg-[#e7e7e6] text-neutral-600 hover:bg-[#dddddc]"
-                  }`}
-                >
-                  <ArrowUpDown className={`h-3.5 w-3.5 ${isAiSorting ? "animate-spin text-neutral-700" : ""}`} />
-                  <span>Priority Wise</span>
-                </button>
 
                 {/* Sync All Mail Button */}
                 <button
@@ -2429,11 +2377,6 @@ export default function MailView() {
                   <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">
                     {folderTitle} ({displayedEmails.length})
                   </span>
-                  {sortByPriority && (
-                    <span className="rounded-full bg-[#dededc] px-2 py-0.5 text-[10px] font-semibold text-neutral-700">
-                      Priority Wise
-                    </span>
-                  )}
                 </div>
                 <button
                   type="button"
