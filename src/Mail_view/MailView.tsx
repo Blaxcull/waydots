@@ -35,6 +35,7 @@ import {
   connectGmailAccount,
   fetchAllGmailFolders,
   getGoogleProviderToken,
+  clearGoogleProviderToken,
   sendGmailDraft,
   sendGmailMessage,
   saveGmailDraft,
@@ -721,7 +722,19 @@ export default function MailView() {
         if (activeFolder === "starred" && !email.starred) return false
         if (activeFolder === "draft" && !email.isDraft) return false
         if (activeFolder === "sent" && !email.isSent) return false
-        if (activeFolder === "inbox" && (email.isDraft || email.isSent)) return false
+        if (activeFolder === "inbox") {
+          if (email.isDraft) return false
+          if (email.isInbox !== undefined) {
+            if (!email.isInbox) return false
+          } else {
+            const isSelf = Boolean(
+              email.senderEmail &&
+              email.recipientEmail &&
+              email.senderEmail.toLowerCase().trim() === email.recipientEmail.toLowerCase().trim()
+            )
+            if (email.isSent && !isSelf) return false
+          }
+        }
       }
 
       if (searchQuery.trim()) {
@@ -1340,7 +1353,16 @@ export default function MailView() {
         }
 
         if (!isSilent) {
-          const inboxCount = allSynced.filter((e) => !e.isDraft && !e.isSent && !e.isTrash).length
+          const inboxCount = allSynced.filter((e) => {
+            if (e.isTrash || e.isDraft) return false
+            if (e.isInbox !== undefined) return e.isInbox
+            const isSelf = Boolean(
+              e.senderEmail &&
+              e.recipientEmail &&
+              e.senderEmail.toLowerCase().trim() === e.recipientEmail.toLowerCase().trim()
+            )
+            return !e.isSent || isSelf
+          }).length
           const starredCount = allSynced.filter((e) => e.starred && !e.isTrash).length
           const trashCount = allSynced.filter((e) => e.isTrash).length
           const sentCount = allSynced.filter((e) => e.isSent && !e.isTrash).length
@@ -1360,6 +1382,7 @@ export default function MailView() {
         err?.message?.includes("401") ||
         err?.message?.includes("invalid authentication")
       ) {
+        clearGoogleProviderToken()
         setHasGoogleToken(false)
         if (!isSilent) {
           triggerToast("Google session has expired. Connecting with Google...")

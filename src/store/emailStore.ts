@@ -46,6 +46,7 @@ export interface Email {
   starred?: boolean
   isDraft?: boolean
   isSent?: boolean
+  isInbox?: boolean
   isTrash?: boolean
   draftId?: string
   threadId?: string
@@ -373,10 +374,20 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
   setActiveFolder: (folder) =>
     set((state) => {
       const matching = state.emails.filter((email) => {
+        if (folder === "trash") return email.isTrash
+        if (email.isTrash) return false
         if (folder === "starred") return email.starred
         if (folder === "draft") return email.isDraft
         if (folder === "sent") return email.isSent
-        return !email.isDraft && !email.isSent
+        // folder === "inbox"
+        if (email.isDraft) return false
+        if (email.isInbox !== undefined) return email.isInbox
+        const isSelf = Boolean(
+          email.senderEmail &&
+          email.recipientEmail &&
+          email.senderEmail.toLowerCase().trim() === email.recipientEmail.toLowerCase().trim()
+        )
+        return !email.isSent || isSelf
       })
       const isCurrentInFolder = matching.some((e) => e.id === state.selectedEmailId)
       return {
@@ -523,6 +534,14 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
       if (!targetEmail) return state
 
       const threadId = targetEmail.threadId || targetEmail.id
+      const normalizedTo = (targetEmail.senderEmail || "").toLowerCase().trim()
+      const normalizedSender = state.senderAccount.toLowerCase().trim()
+      const storedUserEmail = (typeof window !== "undefined" ? localStorage.getItem("user_email") || "" : "").toLowerCase().trim()
+      const isSelfReply = Boolean(
+        normalizedTo &&
+        (normalizedTo === normalizedSender || (storedUserEmail && normalizedTo === storedUserEmail))
+      )
+
       const sentEmail: Email = {
         id: `email-sent-${Date.now()}`,
         subject: targetEmail.subject.startsWith("Re: ")
@@ -533,10 +552,11 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         recipientEmail: targetEmail.senderEmail,
         body: replyText,
         timestamp: "Just now",
-        unread: false,
+        unread: isSelfReply,
         starred: false,
         isDraft: false,
         isSent: true,
+        isInbox: isSelfReply,
         priority: targetEmail.priority,
         threadId,
       }
@@ -652,6 +672,17 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
   }) =>
     set((state) => {
       const isOtp = isOtpEmail({ subject, body })
+      const normalizedTo = (recipientEmail || "").toLowerCase().trim()
+      const normalizedSender = state.senderAccount.toLowerCase().trim()
+      const storedUserEmail = (typeof window !== "undefined" ? localStorage.getItem("user_email") || "" : "").toLowerCase().trim()
+      const isSelfEmail = Boolean(
+        normalizedTo &&
+        (normalizedTo === normalizedSender ||
+         (storedUserEmail && normalizedTo === storedUserEmail) ||
+         normalizedSender.includes(normalizedTo) ||
+         (storedUserEmail && normalizedTo.includes(storedUserEmail)))
+      )
+
       const newEmail: Email = {
         id: `email-${Date.now()}`,
         subject: subject || (isDraft ? "(Untitled Draft)" : "(No Subject)"),
@@ -660,10 +691,11 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         recipientEmail: recipientEmail || "recipient@example.com",
         body,
         timestamp: isDraft ? "Draft" : "Just now",
-        unread: false,
+        unread: isSelfEmail && !isDraft,
         starred: false,
         isDraft,
         isSent: !isDraft,
+        isInbox: !isDraft ? isSelfEmail : false,
         priority: isOtp ? "low" : priority,
         priorityReason: isOtp ? "One-time password (OTP) or authentication security code" : undefined,
         draftId,
@@ -672,7 +704,7 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
       return {
         emails: [newEmail, ...state.emails],
         selectedEmailId: newEmail.id,
-        activeFolder: isDraft ? state.activeFolder : "sent",
+        activeFolder: isSelfEmail ? state.activeFolder : (isDraft ? state.activeFolder : "sent"),
       }
     }),
 }))

@@ -63,18 +63,18 @@ export async function getGoogleProviderToken(): Promise<string | null> {
       }
     }
 
-    // 3. Check dedicated localStorage cache
-    const cachedToken = localStorage.getItem("google_provider_token")
-    if (cachedToken) {
-      return cachedToken
-    }
-
-    // 4. Check Supabase session
+    // 3. Check Supabase session first (prioritizes fresh session tokens)
     const { data } = await supabase.auth.getSession()
     const token = data.session?.provider_token
     if (token) {
       localStorage.setItem("google_provider_token", token)
       return token
+    }
+
+    // 4. Check dedicated localStorage cache
+    const cachedToken = localStorage.getItem("google_provider_token")
+    if (cachedToken) {
+      return cachedToken
     }
 
     // Try refreshing session
@@ -107,6 +107,15 @@ export async function getGoogleProviderToken(): Promise<string | null> {
     return null
   } catch {
     return localStorage.getItem("google_provider_token")
+  }
+}
+
+/**
+ * Clears the cached Google provider token from localStorage.
+ */
+export function clearGoogleProviderToken(): void {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("google_provider_token")
   }
 }
 
@@ -265,26 +274,41 @@ export function extractEmailBodies(payload: any): { plainText: string; htmlBody:
 }
 
 /**
- * Helper to fetch and parse JSON from Gmail API with Authorization header
+ * Helper to fetch and parse JSON from Gmail API with Authorization header and timeout
  */
 async function fetchGmailJson<T>(
   url: string,
-  accessToken: string
-): Promise<{ data: T | null; status: number; ok: boolean }> {
+  accessToken: string,
+  timeoutMs = 7000
+): Promise<{ data: T | null; status: number; ok: boolean; errorText?: string }> {
   try {
+    let signal: AbortSignal | undefined = undefined
+    let timer: ReturnType<typeof setTimeout> | null = null
+    if (typeof AbortSignal !== "undefined" && typeof (AbortSignal as any).timeout === "function") {
+      signal = (AbortSignal as any).timeout(timeoutMs)
+    } else if (typeof AbortController !== "undefined") {
+      const controller = new AbortController()
+      timer = setTimeout(() => controller.abort(), timeoutMs)
+      signal = controller.signal
+    }
+
     const res = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         Accept: "application/json",
       },
+      signal,
     })
+    if (timer) clearTimeout(timer)
     if (!res.ok) {
-      return { data: null, status: res.status, ok: false }
+      const errorText = await res.text().catch(() => "")
+      return { data: null, status: res.status, ok: false, errorText }
     }
     const data = (await res.json()) as T
     return { data, status: res.status, ok: true }
-  } catch {
-    return { data: null, status: 0, ok: false }
+  } catch (err: any) {
+    const isTimeout = err?.name === "AbortError" || err?.name === "TimeoutError"
+    return { data: null, status: isTimeout ? 408 : 0, ok: false, errorText: err?.message }
   }
 }
 
@@ -866,6 +890,7 @@ export async function fetchAllGmailFolders(
     console.error("Gmail API Error (" + profileRes.status + "):", detailedMsg)
 
     if (profileRes.status === 401 || detailedMsg.toLowerCase().includes("invalid authentication")) {
+      clearGoogleProviderToken()
       const authErr = new Error("Google access token has expired. Please sign in again with Google to refresh access.")
       ;(authErr as any).status = 401
       ;(authErr as any).code = "GMAIL_TOKEN_EXPIRED"
@@ -917,28 +942,34 @@ export async function fetchAllGmailFolders(
 
   const [inboxRes, starredRes, sentRes, draftMsgRes, draftsListRes, trashRes] = await Promise.allSettled([
     fetchGmailJson<GmailListResult>(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=in:inbox",
-      accessToken
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&q=in:inbox",
+      accessToken,
+      6000
     ),
     fetchGmailJson<GmailListResult>(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=is:starred",
-      accessToken
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=is:starred",
+      accessToken,
+      6000
     ),
     fetchGmailJson<GmailListResult>(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=in:sent",
-      accessToken
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=in:sent",
+      accessToken,
+      6000
     ),
     fetchGmailJson<GmailListResult>(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&q=in:draft",
-      accessToken
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=in:draft",
+      accessToken,
+      6000
     ),
     fetchGmailJson<GmailDraftsResult>(
-      "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=25",
-      accessToken
+      "https://gmail.googleapis.com/gmail/v1/users/me/drafts?maxResults=10",
+      accessToken,
+      6000
     ),
     fetchGmailJson<GmailListResult>(
-      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25&includeSpamTrash=true&q=in:trash",
-      accessToken
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&includeSpamTrash=true&q=in:trash",
+      accessToken,
+      6000
     ),
   ])
 
@@ -947,6 +978,7 @@ export async function fetchAllGmailFolders(
     (r) => r.status === "fulfilled" && r.value.status === 401
   )
   if (has401) {
+    clearGoogleProviderToken()
     const authErr = new Error("Google access token has expired. Please sign in again with Google to refresh access.")
     ;(authErr as any).status = 401
     ;(authErr as any).code = "GMAIL_TOKEN_EXPIRED"
@@ -1002,13 +1034,13 @@ export async function fetchAllGmailFolders(
     for (const m of trashRes.value.data.messages) recordItem(m.id, m.threadId, "isTrash")
   }
 
-  const itemsToFetch = Array.from(itemMap.values())
+  // 4. Fetch full details in parallel batches of 15 capped to top 35 items
+  const itemsToFetch = Array.from(itemMap.values()).slice(0, 35)
   if (itemsToFetch.length === 0) {
     return []
   }
 
-  // 4. Fetch full details in parallel batches of 10 to minimize latency & respect rate limits
-  const batchSize = 10
+  const batchSize = 15
   const fetchedEmails: Email[] = []
   let authErrorDetected = false
 
@@ -1020,9 +1052,11 @@ export async function fetchAllGmailFolders(
       try {
         const msgRes = await fetchGmailJson<any>(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${meta.id}?format=full`,
-          accessToken
+          accessToken,
+          6500
         )
         if (msgRes.status === 401 || msgRes.status === 403) {
+          if (msgRes.status === 401) clearGoogleProviderToken()
           authErrorDetected = true
           return null
         }
@@ -1030,9 +1064,11 @@ export async function fetchAllGmailFolders(
         if (!msg && meta.draftId) {
           const draftRes = await fetchGmailJson<any>(
             `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${meta.draftId}?format=full`,
-            accessToken
+            accessToken,
+            6500
           )
           if (draftRes.status === 401 || draftRes.status === 403) {
+            if (draftRes.status === 401) clearGoogleProviderToken()
             authErrorDetected = true
             return null
           }
@@ -1046,8 +1082,9 @@ export async function fetchAllGmailFolders(
         const isTrash = Boolean(labelIds.includes("TRASH") || meta.isTrash)
         const isDraft = Boolean((labelIds.includes("DRAFT") || meta.isDraft) && !isTrash)
         const isSent = Boolean((labelIds.includes("SENT") || meta.isSent) && !isDraft && !isTrash)
+        const isInbox = Boolean((labelIds.includes("INBOX") || meta.isInbox) && !isTrash && !isDraft)
         const starred = Boolean((labelIds.includes("STARRED") || meta.isStarred) && !isTrash)
-        const unread = Boolean(labelIds.includes("UNREAD") && !isDraft && !isSent && !isTrash)
+        const unread = Boolean(labelIds.includes("UNREAD") && !isDraft && !isTrash)
 
         const headers: Array<{ name: string; value: string }> = msg.payload?.headers || []
         const getHeader = (name: string) =>
@@ -1118,6 +1155,7 @@ export async function fetchAllGmailFolders(
           starred,
           isDraft: isDraft || undefined,
           isSent: isSent || undefined,
+          isInbox: isInbox || undefined,
           isTrash: isTrash || undefined,
           priority: isTrash ? "low" : "medium",
           priorityReason: isTrash ? "In Trash / Bin" : undefined,

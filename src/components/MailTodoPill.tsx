@@ -3,8 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { useTimeStore } from "@/store/timeStore"
 
-const progressIcon = "/assets/progress.png"
-
 export function MailIcon({ className = "w-9 h-9" }: { className?: string }) {
   return (
     <svg
@@ -29,14 +27,17 @@ export function TodoIcon({ className = "w-9 h-9" }: { className?: string }) {
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
-      strokeWidth="2.2"
+      strokeWidth="1.9"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
       aria-hidden="true"
     >
-      <circle cx="12" cy="12" r="9" strokeDasharray="5.8 3.6" />
-      <path d="m8.5 12.2 2.5 2.5 5-5" strokeWidth="2.4" />
+      <rect x="3" y="4" width="6" height="6" rx="1.5" />
+      <path d="m3 17 2 2 4-4" strokeWidth="2.1" />
+      <path d="M13 6h8" strokeWidth="2" />
+      <path d="M13 12h8" strokeWidth="2" />
+      <path d="M13 18h8" strokeWidth="2" />
     </svg>
   )
 }
@@ -60,7 +61,6 @@ export function MailTodoPill({
   const location = useLocation()
   const selectedDate = useTimeStore((state) => state.selectedDate)
   const [internalActive] = useState<"mail" | "todo" | null>(null)
-  const [imageError, setImageError] = useState(false)
 
   const isMailRoute = location.pathname === "/mail"
   const isTodoRoute = location.pathname === "/todos"
@@ -136,16 +136,7 @@ export function MailTodoPill({
             : "border-transparent hover:border-white/40 hover:shadow-lg hover:scale-100"
         )}
       >
-        {!imageError ? (
-          <img
-            src={progressIcon}
-            alt="To-do list"
-            onError={() => setImageError(true)}
-            className="w-5 h-5 sm:w-9 sm:h-9 opacity-80 object-contain"
-          />
-        ) : (
-          <TodoIcon className="w-5 h-5 sm:w-9 sm:h-9 text-[#404040] opacity-80" />
-        )}
+        <TodoIcon className="w-5 h-5 sm:w-9 sm:h-9 text-[#404040] opacity-80" />
       </button>
     </div>
   )

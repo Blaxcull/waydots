@@ -38,6 +38,8 @@ export function SearchMailDialog({ open, onOpenChange }: SearchMailDialogProps) 
     // Switch active folder to match email type if needed
     if (email.isDraft) {
       setActiveFolder("draft")
+    } else if (email.isInbox) {
+      setActiveFolder("inbox")
     } else if (email.isSent) {
       setActiveFolder("sent")
     } else if (email.starred) {

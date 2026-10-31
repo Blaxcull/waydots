@@ -290,6 +290,7 @@ describe("gmailApiService decoding and HTML extraction", () => {
       expect(inboxMsg).toBeDefined()
       expect(inboxMsg?.isDraft).toBeFalsy()
       expect(inboxMsg?.isSent).toBeFalsy()
+      expect(inboxMsg?.isInbox).toBe(true)
       expect(inboxMsg?.isTrash).toBeFalsy()
       expect(inboxMsg?.starred).toBe(true)
       expect(inboxMsg?.unread).toBe(true)
