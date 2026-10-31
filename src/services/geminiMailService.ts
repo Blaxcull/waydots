@@ -1,4 +1,4 @@
-import type { Email, EmailPriority, MeetingInfo, ScheduleConflict, EmailDraft } from "@/store/emailStore"
+import { isOtpEmail, type Email, type EmailPriority, type MeetingInfo, type ScheduleConflict, type EmailDraft } from "@/store/emailStore"
 import { useEventsStore } from "@/store/eventsStore"
 import { useGoalsStore } from "@/store/goalsStore"
 
@@ -107,10 +107,16 @@ export function analyzeEmailWithKeywords(email: Email): {
   ]
   const isLow = lowKeywords.some((kw) => text.includes(kw))
 
+  const isOtp = isOtpEmail(email)
+
   let priority: EmailPriority = "medium"
   let priorityReason = "Standard communication"
 
-  if (isUrgent || (hasMeeting && (text.includes("today") || text.includes("tomorrow") || isUrgent))) {
+  if (isOtp) {
+    priority = "low"
+    priorityReason = "One-time password (OTP) or authentication security code"
+    meetingInfo = undefined
+  } else if (isUrgent || (hasMeeting && (text.includes("today") || text.includes("tomorrow") || isUrgent))) {
     priority = "high"
     priorityReason = isUrgent
       ? "Contains urgent keywords and actionable deadlines"
@@ -183,7 +189,7 @@ export async function classifyAndSortEmailsWithGemini(
     criteria: {
       high: "Urgent matters, actionable deadlines, time-sensitive meetings, scheduling syncs with specific timing or duration, critical blockers.",
       medium: "Standard project discussions, design reviews, task updates, personal correspondence requiring non-urgent replies.",
-      low: "Newsletters, digests, automated system logs, maintenance notices, informational receipts.",
+      low: "One-time passwords (OTPs), authentication codes, 2FA verification codes, security codes (always classify all OTPs and security codes as low priority), newsletters, digests, automated system logs, maintenance notices, informational receipts.",
     },
     emails: emails.map((e) => ({
       id: e.id,
@@ -206,6 +212,7 @@ Analyze each email and output a JSON array of objects with the exact schema:
     "actionItem": "short action required or null"
   }
 ]
+Important Rule: One-time passwords (OTPs), authentication codes, 2FA verification codes, and security codes must ALWAYS be classified as "low" priority.
 Always return valid JSON only.`;
 
   // Primary model is gemini-3.5-flash-lite (fast & current), with fallbacks
@@ -261,6 +268,16 @@ Always return valid JSON only.`;
       const resultMap = new Map(parsed.map((item) => [item.id, item]))
 
       const updated = emails.map((email) => {
+        // Enforce OTPs are ALWAYS low priority regardless of model response
+        if (isOtpEmail(email)) {
+          return {
+            ...email,
+            priority: "low" as const,
+            priorityReason: "One-time password (OTP) or authentication security code",
+            meetingInfo: undefined,
+          }
+        }
+
         const geminiResult = resultMap.get(email.id)
         if (!geminiResult) {
           const fallback = analyzeEmailWithKeywords(email)

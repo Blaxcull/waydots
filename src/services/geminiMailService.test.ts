@@ -7,7 +7,7 @@ import {
   refineDraftWithAiPrompt,
   generateContextualDraft,
 } from "./geminiMailService"
-import type { Email } from "@/store/emailStore"
+import { isOtpEmail, type Email } from "@/store/emailStore"
 
 describe("geminiMailService", () => {
   const sampleMeetingEmail: Email = {
@@ -33,6 +33,43 @@ describe("geminiMailService", () => {
     unread: false,
     priority: "high",
   }
+
+  const sampleVercelOtpEmail: Email = {
+    id: "test-otp-1",
+    subject: "Your Vercel security code: 458464",
+    senderName: "Vercel",
+    senderEmail: "notifications@vercel.com",
+    recipientEmail: "you@waydots.com",
+    body: "We received a request to create deployment on your Vercel account. Enter code 458464 to verify. This code is valid for 10 minutes. Urgent action required if you did not request this.",
+    timestamp: "5 minutes ago",
+    unread: true,
+    priority: "high", // Pre-existing incorrect priority to be overridden
+  }
+
+  it("always classifies OTP and security code emails as low priority", () => {
+    expect(isOtpEmail(sampleVercelOtpEmail)).toBe(true)
+    const analysis = analyzeEmailWithKeywords(sampleVercelOtpEmail)
+    expect(analysis.priority).toBe("low")
+    expect(analysis.priorityReason).toContain("One-time password")
+    expect(analysis.meetingInfo).toBeUndefined()
+  })
+
+  it("classifies Google and GitHub 2FA codes as low priority", () => {
+    const googleOtp: Email = {
+      id: "test-otp-2",
+      subject: "Google Verification Code",
+      senderName: "Google",
+      senderEmail: "noreply@google.com",
+      recipientEmail: "you@waydots.com",
+      body: "G-938210 is your Google verification code.",
+      timestamp: "Just now",
+      unread: true,
+      priority: "medium",
+    }
+    expect(isOtpEmail(googleOtp)).toBe(true)
+    const analysis = analyzeEmailWithKeywords(googleOtp)
+    expect(analysis.priority).toBe("low")
+  })
 
   it("extracts meeting timing, duration, and priority from keywords", () => {
     const analysis = analyzeEmailWithKeywords(sampleMeetingEmail)

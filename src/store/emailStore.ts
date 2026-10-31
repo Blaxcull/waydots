@@ -54,6 +54,61 @@ export interface Email {
   priorityReason?: string
 }
 
+/**
+ * Detects whether an email represents a one-time password (OTP),
+ * two-factor authentication (2FA) verification code, or login security code.
+ * OTPs must always be classified as low priority.
+ */
+export function isOtpEmail(email: {
+  subject?: string
+  body?: string
+  senderName?: string
+  senderEmail?: string
+}): boolean {
+  const text = `${email.subject || ""} ${email.body || ""} ${email.senderName || ""} ${email.senderEmail || ""}`.toLowerCase()
+
+  const otpKeywords = [
+    "one-time password",
+    "one time password",
+    "verification code",
+    "security code",
+    "auth code",
+    "authentication code",
+    "passcode",
+    "login code",
+    "confirmation code",
+    "two-factor",
+    "2fa",
+    "pin code",
+    "reset code",
+    "access code",
+    "temporary code",
+    "security pin",
+    "your code is",
+    "your verification",
+    "use this code",
+    "enter this code",
+  ]
+
+  if (otpKeywords.some((kw) => text.includes(kw))) {
+    return true
+  }
+
+  if (/\b(otp|2fa|passcode)\b/i.test(text)) {
+    return true
+  }
+
+  if (/\b(?:security|verification|login|access|auth)\s+code\b/i.test(text)) {
+    return true
+  }
+
+  if (/\b(?:code|pin)\s*(?:is|:)\s*\d{4,8}\b/i.test(text)) {
+    return true
+  }
+
+  return false
+}
+
 const INITIAL_EMAILS: Email[] = [
   {
     id: "email-1",
@@ -317,7 +372,18 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
   setPriorityFilter: (priorityFilter) => set({ priorityFilter }),
   setSortByPriority: (sortByPriority) => set({ sortByPriority }),
   toggleSortByPriority: () => set((state) => ({ sortByPriority: !state.sortByPriority })),
-  setEmails: (emails) => set({ emails }),
+  setEmails: (emails) =>
+    set({
+      emails: emails.map((e) =>
+        isOtpEmail(e)
+          ? {
+              ...e,
+              priority: "low" as const,
+              priorityReason: "One-time password (OTP) or authentication security code",
+            }
+          : e
+      ),
+    }),
 
   setSearchQuery: (searchQuery) => set({ searchQuery }),
   setSenderAccount: (senderAccount) => set({ senderAccount }),
@@ -540,6 +606,7 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
     threadId,
   }) =>
     set((state) => {
+      const isOtp = isOtpEmail({ subject, body })
       const newEmail: Email = {
         id: `email-${Date.now()}`,
         subject: subject || (isDraft ? "(Untitled Draft)" : "(No Subject)"),
@@ -552,7 +619,8 @@ export const useEmailStore = create<EmailStoreState>((set) => ({
         starred: false,
         isDraft,
         isSent: !isDraft,
-        priority,
+        priority: isOtp ? "low" : priority,
+        priorityReason: isOtp ? "One-time password (OTP) or authentication security code" : undefined,
         draftId,
         threadId,
       }
