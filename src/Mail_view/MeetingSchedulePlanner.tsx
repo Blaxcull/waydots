@@ -52,7 +52,7 @@ export default function MeetingSchedulePlanner({
   const [startTime, setStartTime] = useState<number>(initial.startTimeMinutes)
   const [duration, setDuration] = useState<number>(initial.durationMinutes)
   const [title, setTitle] = useState<string>(
-    `Meeting with ${email.senderName || "Akash"}: ${email.subject.replace(/^(re:|fwd:|urgent:)\s*/i, "")}`
+    `Meeting with ${email.senderName || "Karnail Singh"}: ${email.subject.replace(/^(re:|fwd:|urgent:)\s*/i, "")}`
   )
 
   // Status feedback state
